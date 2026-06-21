@@ -1,0 +1,546 @@
+// Copyright (c) 2026 Farzan Hajian
+// SPDX-License-Identifier: BSD-3-Clause
+
+package main
+
+import (
+	"encoding/json"
+	"path/filepath"
+	"strings"
+	"testing"
+)
+
+func TestParseAndGenerateCForLanguageFeatures(t *testing.T) {
+	src := strings.Join([]string{
+		`var name:string="FNL"`,
+		`var x:int64=2`,
+		`var y:int64=5`,
+		`var ok:bool=x<y`,
+		`print("hello " + name)`,
+		`if ok {`,
+		`print(to_str(x^y))`,
+		`} else {`,
+		`print("no")`,
+		`}`,
+		`while x<y {`,
+		`x=x+1`,
+		`}`,
+	}, "\n")
+	prog, err := ParseAndCheckSource(src)
+	if err != nil {
+		t.Fatalf("ParseSource returned error: %v", err)
+	}
+	csrc, err := GenerateC(prog)
+	if err != nil {
+		t.Fatalf("GenerateC returned error: %v", err)
+	}
+	for _, want := range []string{"fnl_str_concat", "fnl_pow_i64", "while", "printf(\"%s\""} {
+		if !strings.Contains(csrc, want) {
+			t.Fatalf("generated C missing %q:\n%s", want, csrc)
+		}
+	}
+}
+
+func TestGenerateLLVMForLanguageFeatures(t *testing.T) {
+	prog, err := ParseAndCheckSource(strings.Join([]string{
+		`var s:string="a"`,
+		`var x:int64=1`,
+		`var y:int64=2`,
+		`print(s + to_str(x))`,
+		`if x<y {`,
+		`print("yes")`,
+		`}`,
+	}, "\n"))
+	if err != nil {
+		t.Fatalf("ParseSource returned error: %v", err)
+	}
+	ll, err := GenerateLLVM(prog)
+	if err != nil {
+		t.Fatalf("GenerateLLVM returned error: %v", err)
+	}
+	for _, want := range []string{"target triple", "@fnl_str_concat", "icmp slt", "br i1"} {
+		if !strings.Contains(ll, want) {
+			t.Fatalf("LLVM IR missing %q:\n%s", want, ll)
+		}
+	}
+}
+
+func TestASTJSONRoundTrip(t *testing.T) {
+	prog, err := ParseAndCheckSource(strings.Join([]string{
+		`var x:int64=1`,
+		`if x==1 {`,
+		`println("one")`,
+		`} elseif x==2 {`,
+		`println("two")`,
+		`} else {`,
+		`println("other")`,
+		`}`,
+	}, "\n"))
+	if err != nil {
+		t.Fatalf("ParseAndCheckSource returned error: %v", err)
+	}
+	data, err := ExportAST(prog)
+	if err != nil {
+		t.Fatalf("ExportAST returned error: %v", err)
+	}
+	var root map[string]any
+	if err := json.Unmarshal(data, &root); err != nil {
+		t.Fatalf("exported AST is not valid JSON: %v", err)
+	}
+	if root["format"] != "fnl.ast" || root["kind"] != "Program" {
+		t.Fatalf("unexpected AST root: %v", root)
+	}
+	if !strings.Contains(string(data), `"kind": "IfStmt"`) || !strings.Contains(string(data), `"kind": "IfBranch"`) {
+		t.Fatalf("exported AST missing expected kind fields:\n%s", data)
+	}
+	imported, err := ImportAST(data)
+	if err != nil {
+		t.Fatalf("ImportAST returned error: %v", err)
+	}
+	if err := NewChecker().Check(imported); err != nil {
+		t.Fatalf("imported AST failed semantic checking: %v", err)
+	}
+	csrc, err := GenerateC(imported)
+	if err != nil {
+		t.Fatalf("GenerateC returned error: %v", err)
+	}
+	if !strings.Contains(csrc, "} else if ((x == 2)) {") {
+		t.Fatalf("generated C from imported AST missing elseif:\n%s", csrc)
+	}
+}
+
+func TestASTGraphExport(t *testing.T) {
+	prog, err := ParseAndCheckSource(strings.Join([]string{
+		`var x:int64=1`,
+		`if x==1 {`,
+		`println("one")`,
+		`} elseif x==2 {`,
+		`println("two")`,
+		`}`,
+	}, "\n"))
+	if err != nil {
+		t.Fatalf("ParseAndCheckSource returned error: %v", err)
+	}
+	dot := string(ExportASTGraph(prog))
+	for _, want := range []string{
+		"digraph FNL_AST",
+		`label="Program"`,
+		`label="IfStmt"`,
+		`label="IfBranch\nelseif 1"`,
+		`label="condition"`,
+	} {
+		if !strings.Contains(dot, want) {
+			t.Fatalf("DOT output missing %q:\n%s", want, dot)
+		}
+	}
+}
+
+func TestTypeRules(t *testing.T) {
+	tests := []string{
+		`print(1)`,
+		`if 1 {` + "\n" + `print("x")` + "\n" + `}`,
+		`var x:int64=true`,
+		`var x:int64=1%2.0`,
+		`var x:string="a"+1`,
+		`var x:bool="a"<"b"`,
+	}
+	for _, src := range tests {
+		if _, err := ParseAndCheckSource(src); err == nil {
+			t.Fatalf("expected type error for source:\n%s", src)
+		}
+	}
+}
+
+func TestPowerUsesNumericPromotion(t *testing.T) {
+	prog, err := ParseAndCheckSource(strings.Join([]string{
+		`var int_power:int64=2^3`,
+		`var double_power:double=2.0^3`,
+		`var promoted_power:double=2^3.0`,
+	}, "\n"))
+	if err != nil {
+		t.Fatalf("ParseSource returned error: %v", err)
+	}
+	csrc, err := GenerateC(prog)
+	if err != nil {
+		t.Fatalf("GenerateC returned error: %v", err)
+	}
+	for _, want := range []string{"int64_t int_power = fnl_pow_i64(2, 3);", "double double_power = pow(2.0, (double)(3));", "double promoted_power = pow((double)(2), 3.0);"} {
+		if !strings.Contains(csrc, want) {
+			t.Fatalf("generated C missing %q:\n%s", want, csrc)
+		}
+	}
+	ll, err := GenerateLLVM(prog)
+	if err != nil {
+		t.Fatalf("GenerateLLVM returned error: %v", err)
+	}
+	for _, want := range []string{"define i64 @fnl_pow_i64(i64 %base_arg, i64 %exponent_arg)", "call i64 @fnl_pow_i64", "call double @pow"} {
+		if !strings.Contains(ll, want) {
+			t.Fatalf("LLVM IR missing %q:\n%s", want, ll)
+		}
+	}
+}
+
+func TestSemanticErrorsIncludeLineAndColumn(t *testing.T) {
+	_, err := ParseAndCheckSource(strings.Join([]string{
+		`var num:int64=0`,
+		`num=1.5`,
+	}, "\n"))
+	if err == nil {
+		t.Fatal("expected type error")
+	}
+	if !strings.Contains(err.Error(), `line 2:1: cannot assign double expression to int64 variable "num"`) {
+		t.Fatalf("semantic error should include line and column, got: %v", err)
+	}
+}
+
+func TestStringEqualityAndInequality(t *testing.T) {
+	prog, err := ParseAndCheckSource(strings.Join([]string{
+		`var a:string="same"`,
+		`var b:string="same"`,
+		`var c:string="other"`,
+		`println(to_str(a==b))`,
+		`println(to_str(a!=c))`,
+	}, "\n"))
+	if err != nil {
+		t.Fatalf("ParseSource returned error: %v", err)
+	}
+	csrc, err := GenerateC(prog)
+	if err != nil {
+		t.Fatalf("GenerateC returned error: %v", err)
+	}
+	for _, want := range []string{"strcmp(a, b) == 0", "strcmp(a, c) != 0"} {
+		if !strings.Contains(csrc, want) {
+			t.Fatalf("generated C missing %q:\n%s", want, csrc)
+		}
+	}
+	ll, err := GenerateLLVM(prog)
+	if err != nil {
+		t.Fatalf("GenerateLLVM returned error: %v", err)
+	}
+	for _, want := range []string{"declare i32 @strcmp(ptr, ptr)", "call i32 @strcmp", "icmp eq i32", "icmp ne i32"} {
+		if !strings.Contains(ll, want) {
+			t.Fatalf("LLVM IR missing %q:\n%s", want, ll)
+		}
+	}
+}
+
+func TestInt64ParsingBuiltins(t *testing.T) {
+	prog, err := ParseAndCheckSource(strings.Join([]string{
+		`var good:string="123"`,
+		`var bad:string="12x"`,
+		`var ok:bool=is_int64(good)`,
+		`var not_ok:bool=is_int64(bad)`,
+		`var value:int64=to_int64(good)`,
+		`println(to_str(ok))`,
+		`println(to_str(not_ok))`,
+		`println(to_str(value))`,
+	}, "\n"))
+	if err != nil {
+		t.Fatalf("ParseSource returned error: %v", err)
+	}
+	csrc, err := GenerateC(prog)
+	if err != nil {
+		t.Fatalf("GenerateC returned error: %v", err)
+	}
+	for _, want := range []string{"fnl_is_int64(good)", "fnl_is_int64(bad)", "fnl_to_int64(good)"} {
+		if !strings.Contains(csrc, want) {
+			t.Fatalf("generated C missing %q:\n%s", want, csrc)
+		}
+	}
+	ll, err := GenerateLLVM(prog)
+	if err != nil {
+		t.Fatalf("GenerateLLVM returned error: %v", err)
+	}
+	for _, want := range []string{"define i1 @fnl_is_int64(ptr %s)", "define i64 @fnl_to_int64(ptr %s)", "call i1 @fnl_is_int64", "call i64 @fnl_to_int64"} {
+		if !strings.Contains(ll, want) {
+			t.Fatalf("LLVM IR missing %q:\n%s", want, ll)
+		}
+	}
+}
+
+func TestDoubleParsingBuiltins(t *testing.T) {
+	prog, err := ParseAndCheckSource(strings.Join([]string{
+		`var good:string="12.5"`,
+		`var bad:string="12x"`,
+		`var ok:bool=is_double(good)`,
+		`var not_ok:bool=is_double(bad)`,
+		`var value:double=to_double(good)`,
+		`println(to_str(ok))`,
+		`println(to_str(not_ok))`,
+		`println(to_str(value))`,
+	}, "\n"))
+	if err != nil {
+		t.Fatalf("ParseSource returned error: %v", err)
+	}
+	csrc, err := GenerateC(prog)
+	if err != nil {
+		t.Fatalf("GenerateC returned error: %v", err)
+	}
+	for _, want := range []string{"fnl_is_double(good)", "fnl_is_double(bad)", "fnl_to_double(good)"} {
+		if !strings.Contains(csrc, want) {
+			t.Fatalf("generated C missing %q:\n%s", want, csrc)
+		}
+	}
+	ll, err := GenerateLLVM(prog)
+	if err != nil {
+		t.Fatalf("GenerateLLVM returned error: %v", err)
+	}
+	for _, want := range []string{"define i1 @fnl_is_double(ptr %s)", "define double @fnl_to_double(ptr %s)", "call i1 @fnl_is_double", "call double @fnl_to_double"} {
+		if !strings.Contains(ll, want) {
+			t.Fatalf("LLVM IR missing %q:\n%s", want, ll)
+		}
+	}
+}
+
+func TestInt64ParsingBuiltinsRequireString(t *testing.T) {
+	tests := []string{
+		`var ok:bool=is_int64(123)`,
+		`var value:int64=to_int64(123)`,
+		`var ok:bool=is_double(123)`,
+		`var value:double=to_double(123)`,
+	}
+	for _, src := range tests {
+		if _, err := ParseAndCheckSource(src); err == nil {
+			t.Fatalf("expected type error for source:\n%s", src)
+		}
+	}
+}
+
+func TestStrAliasIsRejected(t *testing.T) {
+	_, err := ParseAndCheckSource(`println(str(1))`)
+	if err == nil {
+		t.Fatal("expected str alias to be rejected")
+	}
+}
+
+func TestInputReturnsString(t *testing.T) {
+	prog, err := ParseAndCheckSource(strings.Join([]string{
+		`var name:string=input()`,
+		`println("hello " + name)`,
+	}, "\n"))
+	if err != nil {
+		t.Fatalf("ParseSource returned error: %v", err)
+	}
+	csrc, err := GenerateC(prog)
+	if err != nil {
+		t.Fatalf("GenerateC returned error: %v", err)
+	}
+	if !strings.Contains(csrc, "char* name = fnl_input();") {
+		t.Fatalf("generated C missing input call:\n%s", csrc)
+	}
+	ll, err := GenerateLLVM(prog)
+	if err != nil {
+		t.Fatalf("GenerateLLVM returned error: %v", err)
+	}
+	for _, want := range []string{"define ptr @fnl_input()", "call ptr @fnl_input()"} {
+		if !strings.Contains(ll, want) {
+			t.Fatalf("LLVM IR missing %q:\n%s", want, ll)
+		}
+	}
+}
+
+func TestBreakAndExitStatements(t *testing.T) {
+	prog, err := ParseAndCheckSource(strings.Join([]string{
+		`var x:int64=0`,
+		`while x<10 {`,
+		`x=x+1`,
+		`if x==3 {`,
+		`break`,
+		`}`,
+		`}`,
+		`exit(0)`,
+	}, "\n"))
+	if err != nil {
+		t.Fatalf("ParseSource returned error: %v", err)
+	}
+	csrc, err := GenerateC(prog)
+	if err != nil {
+		t.Fatalf("GenerateC returned error: %v", err)
+	}
+	for _, want := range []string{"break;", "exit((int)(0));"} {
+		if !strings.Contains(csrc, want) {
+			t.Fatalf("generated C missing %q:\n%s", want, csrc)
+		}
+	}
+	ll, err := GenerateLLVM(prog)
+	if err != nil {
+		t.Fatalf("GenerateLLVM returned error: %v", err)
+	}
+	for _, want := range []string{"declare void @exit(i32)", "br label %while.end", "call void @exit(i32 0)", "unreachable"} {
+		if !strings.Contains(ll, want) {
+			t.Fatalf("LLVM IR missing %q:\n%s", want, ll)
+		}
+	}
+}
+
+func TestBreakRequiresLoopAndExitRequiresInt64(t *testing.T) {
+	tests := []string{
+		`break`,
+		`exit("no")`,
+		`exit(1.5)`,
+	}
+	for _, src := range tests {
+		if _, err := ParseAndCheckSource(src); err == nil {
+			t.Fatalf("expected semantic error for source:\n%s", src)
+		}
+	}
+}
+
+func TestParseArgsDefaultsAndFlags(t *testing.T) {
+	opts, err := ParseArgs([]string{"examples/basics.fnl", "-o", filepath.Join("outputs", "app.exe"), "--emit-c", "--emit-llvm", "--emit-ast", "--emit-ast-graph", "--backend=clang"})
+	if err != nil {
+		t.Fatalf("ParseArgs returned error: %v", err)
+	}
+	if opts.Output != filepath.Join("outputs", "app.exe") || !opts.EmitC || !opts.EmitLLVM || !opts.EmitAST || !opts.EmitGraph || opts.Backend != "clang" {
+		t.Fatalf("unexpected options: %+v", opts)
+	}
+}
+
+func TestParseArgsAcceptsASTInput(t *testing.T) {
+	opts, err := ParseArgs([]string{filepath.Join("outputs", "basics.fnl.ast")})
+	if err != nil {
+		t.Fatalf("ParseArgs returned error: %v", err)
+	}
+	if opts.Output != "basics"+hostExeExt() {
+		t.Fatalf("unexpected default output for AST input: %+v", opts)
+	}
+}
+
+func TestParseArgsRejectsTargetOption(t *testing.T) {
+	_, err := ParseArgs([]string{"examples/basics.fnl", "--target=linux-x64"})
+	if err == nil {
+		t.Fatal("expected --target to be rejected")
+	}
+	if !strings.Contains(err.Error(), "unknown option --target=linux-x64") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestCompilerArgsDoNotForceClangTarget(t *testing.T) {
+	args := compilerArgs("clang", "input.c", "app.exe")
+	for _, arg := range args {
+		if strings.HasPrefix(arg, "--target=") {
+			t.Fatalf("compilerArgs should not force a target, got %v", args)
+		}
+	}
+}
+
+func TestClangArgsOnWindowsDoNotLinkUnixMathLibrary(t *testing.T) {
+	args := compilerArgs("clang", "input.c", "app.exe")
+	if hostExeExt() != ".exe" {
+		t.Skip("Windows-specific clang/MSVC behavior")
+	}
+	for _, arg := range args {
+		if arg == "-lm" {
+			t.Fatalf("clang on Windows should not link Unix libm, got %v", args)
+		}
+	}
+}
+
+func TestMSVCToolchainCheck(t *testing.T) {
+	getenv := func(key string) string {
+		if key == "VCToolsInstallDir" {
+			return `C:\BuildTools\VC\Tools\MSVC\14.0`
+		}
+		return ""
+	}
+	lookPath := func(string) (string, error) {
+		return "", filepath.ErrBadPattern
+	}
+	if !hasMSVCToolchain(getenv, lookPath) {
+		t.Fatal("expected VCToolsInstallDir to satisfy MSVC toolchain check")
+	}
+}
+
+func TestIfWithoutElseDoesNotConsumeFollowingStatementNewline(t *testing.T) {
+	_, err := ParseAndCheckSource(strings.Join([]string{
+		`var x:int64=0`,
+		`if x==0 {`,
+		`print("zero")`,
+		`}`,
+		`while x<2 {`,
+		`x=x+1`,
+		`}`,
+	}, "\n"))
+	if err != nil {
+		t.Fatalf("ParseSource returned error: %v", err)
+	}
+}
+
+func TestElseIfBranches(t *testing.T) {
+	prog, err := ParseAndCheckSource(strings.Join([]string{
+		`var x:int64=2`,
+		`if x==1 {`,
+		`println("one")`,
+		`} elseif x==2 {`,
+		`println("two")`,
+		`} elseif x==3 {`,
+		`println("three")`,
+		`} else {`,
+		`println("other")`,
+		`}`,
+	}, "\n"))
+	if err != nil {
+		t.Fatalf("ParseSource returned error: %v", err)
+	}
+	csrc, err := GenerateC(prog)
+	if err != nil {
+		t.Fatalf("GenerateC returned error: %v", err)
+	}
+	for _, want := range []string{"} else if ((x == 2)) {", "} else if ((x == 3)) {", "} else {"} {
+		if !strings.Contains(csrc, want) {
+			t.Fatalf("generated C missing %q:\n%s", want, csrc)
+		}
+	}
+	ll, err := GenerateLLVM(prog)
+	if err != nil {
+		t.Fatalf("GenerateLLVM returned error: %v", err)
+	}
+	for _, want := range []string{"elseif.then", "elseif.next", "if.end"} {
+		if !strings.Contains(ll, want) {
+			t.Fatalf("LLVM IR missing %q:\n%s", want, ll)
+		}
+	}
+}
+
+func TestElseIfConditionMustBeBool(t *testing.T) {
+	_, err := ParseAndCheckSource(strings.Join([]string{
+		`if true {`,
+		`println("ok")`,
+		`} elseif 1 {`,
+		`println("bad")`,
+		`}`,
+	}, "\n"))
+	if err == nil {
+		t.Fatal("expected elseif condition type error")
+	}
+	if !strings.Contains(err.Error(), "elseif condition must be bool") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestNewPrintAndLexingFeatures(t *testing.T) {
+	src := strings.Join([]string{
+		`/* multiline`,
+		`   comment */`,
+		`var x:int64=1`,
+		`var y:int64=2`,
+		`var s:string="a\n\tb"`,
+		`print(s)`,
+		`println(to_str(x!=y))`,
+		`prinln("alias")`,
+	}, "\n")
+	prog, err := ParseAndCheckSource(src)
+	if err != nil {
+		t.Fatalf("ParseSource returned error: %v", err)
+	}
+	csrc, err := GenerateC(prog)
+	if err != nil {
+		t.Fatalf("GenerateC returned error: %v", err)
+	}
+	for _, want := range []string{`printf("%s", s);`, `printf("%s\n", fnl_str_bool((x != y)));`, `fnl_strdup("a\n\tb")`} {
+		if !strings.Contains(csrc, want) {
+			t.Fatalf("generated C missing %q:\n%s", want, csrc)
+		}
+	}
+}
