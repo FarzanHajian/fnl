@@ -207,6 +207,258 @@ String:
 
 This grammar describes `.fnl` source files. `.fnl.ast` JSON files and `.fnl.ast.dot` Graphviz DOT files are compiler artifact formats, not part of the FNL source grammar.
 
+There are two grammar views:
+
+- The language reference grammar describes the intended source language in a human-facing way.
+- The parser implementation grammar describes the shape currently used by the handwritten recursive descent parser.
+
+### Language Reference Grammar
+
+The reference grammar intentionally keeps expressions compact. Operator precedence and associativity are specified after the grammar instead of being encoded as parser layers.
+
+Precedence, highest to lowest:
+
+```text
+unary -
+^                 right-associative
+* / %
++ -
+< <= > >= == !=
+```
+
+`+`, `-`, `*`, `/`, and `%` are left-associative. Comparison operators are non-associative; FNL currently allows one comparison operator per expression level, so `a < b < c` requires explicit rewriting.
+
+BNF notation:
+
+```bnf
+<program> ::= <newlines-opt> <statement-list-opt> <newlines-opt> <eof>
+
+<statement-list-opt> ::= ε
+                       | <statement-list>
+
+<statement-list> ::= <statement>
+                   | <statement> <newlines> <statement-list>
+
+<statement> ::= <var-declaration>
+              | <assignment>
+              | <print-statement>
+              | <println-statement>
+              | <exit-statement>
+              | <break-statement>
+              | <if-statement>
+              | <while-statement>
+
+<var-declaration> ::= "var" <identifier> ":" <type> "=" <expression>
+
+<assignment> ::= <identifier> "=" <expression>
+
+<print-statement> ::= "print" "(" <expression> ")"
+
+<println-statement> ::= "println" "(" <expression> ")"
+                      | "prinln" "(" <expression> ")"
+
+<exit-statement> ::= "exit" "(" <expression> ")"
+
+<break-statement> ::= "break"
+
+<if-statement> ::= "if" <expression> <block> <elseif-list-opt> <else-opt>
+
+<elseif-list-opt> ::= ε
+                    | <elseif-list>
+
+<elseif-list> ::= <elseif-clause>
+                | <elseif-clause> <elseif-list>
+
+<elseif-clause> ::= <newlines-opt> "elseif" <expression> <block>
+
+<else-opt> ::= ε
+             | <newlines-opt> "else" <block>
+
+<while-statement> ::= "while" <expression> <block>
+
+<block> ::= "{" <newlines-opt> <statement-list> <newlines-opt> "}"
+
+<type> ::= "int64"
+         | "double"
+         | "bool"
+         | "string"
+
+<expression> ::= <unary-expression>
+               | <expression> <binary-operator> <expression>
+
+<unary-expression> ::= "-" <unary-expression>
+                     | <primary>
+
+<binary-operator> ::= "+"
+                    | "-"
+                    | "*"
+                    | "/"
+                    | "%"
+                    | "^"
+                    | "<"
+                    | "<="
+                    | ">"
+                    | ">="
+                    | "=="
+                    | "!="
+
+<primary> ::= <integer-literal>
+            | <double-literal>
+            | <bool-literal>
+            | <string-literal>
+            | <identifier>
+            | <builtin-call>
+            | "(" <expression> ")"
+
+<builtin-call> ::= <to-str-call>
+                 | <is-int64-call>
+                 | <to-int64-call>
+                 | <is-double-call>
+                 | <to-double-call>
+                 | <input-call>
+
+<to-str-call> ::= "to_str" "(" <expression> ")"
+
+<is-int64-call> ::= "is_int64" "(" <expression> ")"
+
+<to-int64-call> ::= "to_int64" "(" <expression> ")"
+
+<is-double-call> ::= "is_double" "(" <expression> ")"
+
+<to-double-call> ::= "to_double" "(" <expression> ")"
+
+<input-call> ::= "input" "(" ")"
+
+<bool-literal> ::= "true"
+                 | "false"
+
+<string-literal> ::= "\"" <string-characters-opt> "\""
+
+<string-characters-opt> ::= ε
+                          | <string-character> <string-characters-opt>
+
+<string-character> ::= <non-quote-non-backslash-non-newline-character>
+                     | "\\" "n"
+                     | "\\" "t"
+                     | "\\" "\""
+                     | "\\" "\\"
+
+<newlines-opt> ::= ε
+                 | <newlines>
+
+<newlines> ::= <newline>
+             | <newline> <newlines>
+
+<identifier> ::= <letter-or-underscore> <identifier-tail-opt>
+
+<identifier-tail-opt> ::= ε
+                        | <identifier-char> <identifier-tail-opt>
+
+<identifier-char> ::= <letter-or-underscore>
+                    | <digit>
+
+<integer-literal> ::= <digit> <digits-opt>
+
+<double-literal> ::= <digit> <digits-opt> "." <digit> <digits-opt>
+
+<digits-opt> ::= ε
+               | <digit> <digits-opt>
+```
+
+EBNF notation:
+
+```ebnf
+program        = newlines? statementList? newlines? EOF ;
+
+statementList  = statement (newlines statement)* ;
+
+statement      = varDeclaration
+               | assignment
+               | printStatement
+               | printlnStatement
+               | exitStatement
+               | breakStatement
+               | ifStatement
+               | whileStatement ;
+
+varDeclaration = "var" identifier ":" type "=" expression ;
+
+assignment     = identifier "=" expression ;
+
+printStatement = "print" "(" expression ")" ;
+
+printlnStatement = ("println" | "prinln") "(" expression ")" ;
+
+exitStatement  = "exit" "(" expression ")" ;
+
+breakStatement = "break" ;
+
+ifStatement    = "if" expression block (newlines? "elseif" expression block)* (newlines? "else" block)? ;
+
+whileStatement = "while" expression block ;
+
+block          = "{" newlines? statementList newlines? "}" ;
+
+type           = "int64" | "double" | "bool" | "string" ;
+
+expression     = unaryExpression | expression binaryOperator expression ;
+
+unaryExpression = "-" unaryExpression | primary ;
+
+binaryOperator = "+" | "-" | "*" | "/" | "%" | "^" | "<" | "<=" | ">" | ">=" | "==" | "!=" ;
+
+primary        = integerLiteral
+               | doubleLiteral
+               | boolLiteral
+               | stringLiteral
+               | identifier
+               | builtinCall
+               | "(" expression ")" ;
+
+builtinCall    = toStrCall
+               | isInt64Call
+               | toInt64Call
+               | isDoubleCall
+               | toDoubleCall
+               | inputCall ;
+
+toStrCall      = "to_str" "(" expression ")" ;
+
+isInt64Call    = "is_int64" "(" expression ")" ;
+
+toInt64Call    = "to_int64" "(" expression ")" ;
+
+isDoubleCall   = "is_double" "(" expression ")" ;
+
+toDoubleCall   = "to_double" "(" expression ")" ;
+
+inputCall      = "input" "(" ")" ;
+
+boolLiteral    = "true" | "false" ;
+
+stringLiteral  = "\"" stringCharacter* "\"" ;
+
+stringCharacter = nonQuoteNonBackslashNonNewlineCharacter
+                | "\\" "n"
+                | "\\" "t"
+                | "\\" "\""
+                | "\\" "\\" ;
+
+newlines       = newline+ ;
+
+identifier     = letterOrUnderscore identifierChar* ;
+
+identifierChar = letterOrUnderscore | digit ;
+
+integerLiteral = digit+ ;
+
+doubleLiteral  = digit+ "." digit+ ;
+```
+
+### Parser Implementation Grammar
+
+The parser grammar removes left recursion and encodes precedence directly. This is the grammar shape to compare against `parser.go`. The BNF tail productions represent parser loops; `+`, `-`, `*`, `/`, and `%` still build left-associative ASTs.
+
 BNF notation:
 
 ```bnf
@@ -264,22 +516,28 @@ BNF notation:
 
 <expression> ::= <comparison>
 
-<comparison> ::= <additive>
-               | <additive> "<" <additive>
-               | <additive> "<=" <additive>
-               | <additive> ">" <additive>
-               | <additive> ">=" <additive>
-               | <additive> "==" <additive>
-               | <additive> "!=" <additive>
+<comparison> ::= <additive> <comparison-tail-opt>
 
-<additive> ::= <multiplicative>
-             | <additive> "+" <multiplicative>
-             | <additive> "-" <multiplicative>
+<comparison-tail-opt> ::= ε
+                        | "<" <additive>
+                        | "<=" <additive>
+                        | ">" <additive>
+                        | ">=" <additive>
+                        | "==" <additive>
+                        | "!=" <additive>
 
-<multiplicative> ::= <power>
-                   | <multiplicative> "*" <power>
-                   | <multiplicative> "/" <power>
-                   | <multiplicative> "%" <power>
+<additive> ::= <multiplicative> <additive-tail-opt>
+
+<additive-tail-opt> ::= ε
+                      | "+" <multiplicative> <additive-tail-opt>
+                      | "-" <multiplicative> <additive-tail-opt>
+
+<multiplicative> ::= <power> <multiplicative-tail-opt>
+
+<multiplicative-tail-opt> ::= ε
+                            | "*" <power> <multiplicative-tail-opt>
+                            | "/" <power> <multiplicative-tail-opt>
+                            | "%" <power> <multiplicative-tail-opt>
 
 <power> ::= <unary>
           | <unary> "^" <power>
