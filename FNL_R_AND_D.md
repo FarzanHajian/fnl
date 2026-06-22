@@ -446,6 +446,60 @@ symbol table = known declarations and their meanings
 
 They work together. The checker walks the AST and builds/queries the symbol table as it goes. Once FNL grows functions, user-defined types, arrays, structs, and modules, the symbol table will become more important and will likely split into separate tables for variables, functions, and types.
 
+## Editor Tooling And Debugging
+
+Once the compiler could emit executables, C, LLVM IR, AST JSON, and Graphviz DOT, the project started to feel less like a toy parser and more like a small programming environment. That naturally led to two usability questions: how pleasant is it to write FNL, and how painful is it to debug FNL?
+
+The first answer was syntax highlighting. We added a small local VS Code extension under:
+
+```text
+vscode-fnl/
+```
+
+It is a TextMate grammar extension, not a full language server. That is the right size for the current project. It recognizes `.fnl` files and highlights:
+
+- keywords such as `var`, `if`, `elseif`, `else`, `while`, `break`, and `exit`
+- primitive types such as `int64`, `double`, `bool`, and `string`
+- built-ins such as `print`, `println`, `input`, `to_str`, `is_int64`, `to_int64`, `is_double`, and `to_double`
+- strings and supported escape sequences
+- multiline comments
+- numbers, operators, and identifiers
+
+This is a modest feature, but it changes the feeling of the language. FNL source files now look intentional in an editor instead of being anonymous plain text.
+
+Debugging is trickier. The current compiler pipeline is:
+
+```text
+FNL source -> generated C -> native compiler -> executable
+```
+
+So when something goes wrong at runtime, the available debugger naturally sees C code, C line numbers, and generated C expressions. That is why debugging `sqrt.fnl` required looking at the emitted C. It worked, but it was not really FNL-level debugging.
+
+We decided not to jump directly into a full debugger. The realistic roadmap starts with a compiler flag:
+
+```text
+--debug
+```
+
+The first version of `--debug` should keep the generated C file, compile with debug symbols, disable optimization, and add C `#line` directives. A generated statement could look conceptually like this:
+
+```c
+#line 42 "examples/sqrt.fnl"
+guess = ((guess + ((double)num / guess)) / 2.0);
+```
+
+That would let GCC, Clang, GDB, LLDB, or Visual Studio map generated C instructions back to `.fnl` source locations where the native toolchain supports it. It would not be a perfect FNL debugger, but it would be a very practical bridge.
+
+We also parked several later ideas:
+
+- `--debug-map` for emitting a JSON map from FNL source ranges to generated C ranges
+- `--trace` for compiler-injected runtime traces of statement execution and condition results
+- `--trace-vars` for tracing variable values after declarations and assignments
+- more readable generated C in debug mode, with stable variable names and source-line comments
+- a future VS Code Debug Adapter Protocol integration on top of GDB, LLDB, or Visual Studio debugging
+
+The important lesson is that debugging is not a single feature. It is a ladder. At the bottom is readable emitted code. Above that are source mappings and debug compiler flags. Much later comes a real source-level debugger that understands FNL variables and runtime values directly.
+
 ## Bugs We Found
 
 ### Optional Else Consumed Too Much
@@ -583,6 +637,8 @@ The next natural improvements would be:
 - better memory management for generated strings
 - direct LLVM executable generation through `fnlc`, instead of only emitting buildable `.ll`
 - better diagnostic spans and source snippets
+- first-stage debug mode with `#line`, kept C output, and `-g -O0`
+- richer editor tooling beyond basic VS Code syntax highlighting
 - file I/O
 - user-defined `type` declarations for arrays and structs
 - a built-in linter

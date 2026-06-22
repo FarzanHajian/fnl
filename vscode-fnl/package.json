@@ -1,0 +1,36 @@
+{
+  "name": "fnl-syntax",
+  "displayName": "FNL Syntax",
+  "description": "Syntax highlighting for Fazan's Neat Language (.fnl).",
+  "version": "0.0.1",
+  "publisher": "fnl",
+  "license": "BSD-3-Clause",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "fnl",
+        "aliases": [
+          "FNL",
+          "fnl"
+        ],
+        "extensions": [
+          ".fnl"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "fnl",
+        "scopeName": "source.fnl",
+        "path": "./syntaxes/fnl.tmLanguage.json"
+      }
+    ]
+  }
+}

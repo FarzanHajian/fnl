@@ -69,6 +69,7 @@ The code is intentionally modular:
 - `target.go`: host-platform defaults and backend arguments
 - `main.go`: CLI entry point and build orchestration
 - `compiler_test.go`: regression tests
+- `vscode-fnl/`: local VS Code TextMate grammar extension for `.fnl` syntax highlighting
 
 ## Parser
 
@@ -779,6 +780,27 @@ Possible lint rules:
 - suggest `println()` instead of `print("...\n")`
 - warn about obviously overflow-prone integer expressions when literals make that visible
 - warn when `to_int64()` or `to_double()` are used without a nearby validating `is_int64()` or `is_double()` guard
+
+Future debugging support should start small and build toward real source-level FNL debugging.
+
+Possible debugging CLI:
+
+```powershell
+fnlc.exe source.fnl --debug
+fnlc.exe source.fnl --debug-map
+fnlc.exe source.fnl --trace
+fnlc.exe source.fnl --trace-vars
+```
+
+- `--debug` should keep the generated C file, compile with debug symbols, disable optimization, and emit C `#line` directives that map generated C back to `.fnl` source lines.
+- For GCC/Clang backends, `--debug` should add flags like `-g` and `-O0`.
+- Generated C should remain readable in debug mode, with stable variable names and comments showing the original FNL source line where helpful.
+- `#line` directives are the first practical bridge between native debuggers and FNL source locations. They should let tools like GDB, LLDB, or Visual Studio show `.fnl` file and line information where the C toolchain supports it.
+- `--debug-map` could emit a JSON source map, for example `source.fnl.map`, recording FNL line/column ranges and generated C line ranges.
+- `--trace` could inject runtime prints for statement execution, condition results, and loop progress.
+- `--trace-vars` could extend tracing with variable values after declarations and assignments.
+- Full VS Code debugging would likely require a Debug Adapter Protocol implementation on top of GDB, LLDB, or the Visual Studio debugger.
+- A real FNL debugger will need reliable source maps, stable generated names, runtime metadata for strings and future compound types, and a way to translate native debugger values back into FNL values.
 
 ## Useful Commands
 

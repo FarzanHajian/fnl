@@ -12,6 +12,18 @@ This software is distributed under the BSD 3-Clause License. See [LICENSE](LICEN
 go build -o fnlc.exe .
 ```
 
+## VS Code Syntax Highlighting
+
+This repository includes a small local VS Code extension in `vscode-fnl` for `.fnl` syntax highlighting.
+
+Install it for local development:
+
+```powershell
+Copy-Item -Recurse -Force .\vscode-fnl "$env:USERPROFILE\.vscode\extensions\fnl-syntax-0.0.1"
+```
+
+After installation, reopen any `.fnl` file or run `Developer: Reload Window` in VS Code.
+
 ## Usage
 
 ```powershell
