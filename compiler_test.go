@@ -140,6 +140,7 @@ func TestTypeRules(t *testing.T) {
 		`print(1)`,
 		`if 1 {` + "\n" + `print("x")` + "\n" + `}`,
 		`var x:int=true`,
+		`var x:double=1`,
 		`var x:int=1%2.0`,
 		`var x:string="a"+1`,
 		`var x:bool=true<false`,
@@ -178,6 +179,34 @@ func TestPowerUsesNumericPromotion(t *testing.T) {
 	for _, want := range []string{"define i64 @fnl_pow_int(i64 %base_arg, i64 %exponent_arg)", "call i64 @fnl_pow_int", "call double @pow"} {
 		if !strings.Contains(ll, want) {
 			t.Fatalf("LLVM IR missing %q:\n%s", want, ll)
+		}
+	}
+}
+
+func TestStrictAssignmentButMixedNumericExpressionsPromote(t *testing.T) {
+	_, err := ParseAndCheckSource(strings.Join([]string{
+		`var i:int=10`,
+		`var result:double=10+i`,
+	}, "\n"))
+	if err == nil {
+		t.Fatal("expected int expression assigned to double to be rejected")
+	}
+
+	prog, err := ParseAndCheckSource(strings.Join([]string{
+		`var d:double=10.0`,
+		`var result:double=10+d`,
+		`var ok:bool=10<d`,
+	}, "\n"))
+	if err != nil {
+		t.Fatalf("mixed numeric expression should promote: %v", err)
+	}
+	csrc, err := GenerateC(prog)
+	if err != nil {
+		t.Fatalf("GenerateC returned error: %v", err)
+	}
+	for _, want := range []string{"double result = ((double)(10) + d);", "int ok = ((double)(10) < d);"} {
+		if !strings.Contains(csrc, want) {
+			t.Fatalf("generated C missing %q:\n%s", want, csrc)
 		}
 	}
 }
@@ -270,6 +299,8 @@ func TestDoubleParsingBuiltins(t *testing.T) {
 		`var ok:bool=is_double(good)`,
 		`var not_ok:bool=is_double(bad)`,
 		`var value:double=to_double(good)`,
+		`var exact:bool=is_double(42)`,
+		`var from_int:double=to_double(42)`,
 		`println(to_str(ok))`,
 		`println(to_str(not_ok))`,
 		`println(to_str(value))`,
@@ -281,7 +312,7 @@ func TestDoubleParsingBuiltins(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GenerateC returned error: %v", err)
 	}
-	for _, want := range []string{"fnl_is_double(good)", "fnl_is_double(bad)", "fnl_to_double(good)"} {
+	for _, want := range []string{"fnl_is_double(good)", "fnl_is_double(bad)", "fnl_to_double(good)", "fnl_is_double_int(42)", "(double)(42)"} {
 		if !strings.Contains(csrc, want) {
 			t.Fatalf("generated C missing %q:\n%s", want, csrc)
 		}
@@ -290,19 +321,50 @@ func TestDoubleParsingBuiltins(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GenerateLLVM returned error: %v", err)
 	}
-	for _, want := range []string{"define i1 @fnl_is_double(ptr %s)", "define double @fnl_to_double(ptr %s)", "call i1 @fnl_is_double", "call double @fnl_to_double"} {
+	for _, want := range []string{"define i1 @fnl_is_double(ptr %s)", "define i1 @fnl_is_double_int(i64 %value)", "define double @fnl_to_double(ptr %s)", "call i1 @fnl_is_double", "call i1 @fnl_is_double_int", "call double @fnl_to_double", "sitofp i64 42 to double"} {
 		if !strings.Contains(ll, want) {
 			t.Fatalf("LLVM IR missing %q:\n%s", want, ll)
 		}
 	}
 }
 
-func TestIntParsingBuiltinsRequireString(t *testing.T) {
+func TestNumericConversionOverloads(t *testing.T) {
+	prog, err := ParseAndCheckSource(strings.Join([]string{
+		`var d:double=12.75`,
+		`var can_fit:bool=is_int(d)`,
+		`var i:int=to_int(d)`,
+		`println(to_str(can_fit))`,
+		`println(to_str(i))`,
+	}, "\n"))
+	if err != nil {
+		t.Fatalf("ParseSource returned error: %v", err)
+	}
+	csrc, err := GenerateC(prog)
+	if err != nil {
+		t.Fatalf("GenerateC returned error: %v", err)
+	}
+	for _, want := range []string{"fnl_is_int_double(d)", "(int64_t)(d)"} {
+		if !strings.Contains(csrc, want) {
+			t.Fatalf("generated C missing %q:\n%s", want, csrc)
+		}
+	}
+	ll, err := GenerateLLVM(prog)
+	if err != nil {
+		t.Fatalf("GenerateLLVM returned error: %v", err)
+	}
+	for _, want := range []string{"define i1 @fnl_is_int_double(double %value)", "call i1 @fnl_is_int_double", "fptosi double"} {
+		if !strings.Contains(ll, want) {
+			t.Fatalf("LLVM IR missing %q:\n%s", want, ll)
+		}
+	}
+}
+
+func TestConversionBuiltinsRejectUnsupportedTypes(t *testing.T) {
 	tests := []string{
-		`var ok:bool=is_int(123)`,
-		`var value:int=to_int(123)`,
-		`var ok:bool=is_double(123)`,
-		`var value:double=to_double(123)`,
+		`var ok:bool=is_int(true)`,
+		`var value:int=to_int(true)`,
+		`var ok:bool=is_double(true)`,
+		`var value:double=to_double(true)`,
 	}
 	for _, src := range tests {
 		if _, err := ParseAndCheckSource(src); err == nil {

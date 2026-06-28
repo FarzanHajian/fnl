@@ -75,10 +75,6 @@ func (g *LLVMCodegen) stmt(stmt Stmt) error {
 		if err != nil {
 			return err
 		}
-		value, err = g.convert(value, s.Type)
-		if err != nil {
-			return err
-		}
 		ptr := g.temp()
 		g.line("  %s = alloca %s", ptr, llvmType(s.Type))
 		g.line("  store %s %s, ptr %s", llvmType(s.Type), value.name, ptr)
@@ -89,10 +85,6 @@ func (g *LLVMCodegen) stmt(stmt Stmt) error {
 			return fmt.Errorf("internal error: unknown variable %q during LLVM generation", s.Name)
 		}
 		value, err := g.expr(s.Value)
-		if err != nil {
-			return err
-		}
-		value, err = g.convert(value, binding.typ)
 		if err != nil {
 			return err
 		}
@@ -204,6 +196,10 @@ func (g *LLVMCodegen) expr(expr Expr) (LLVMValue, error) {
 			return LLVMValue{}, err
 		}
 		result := g.temp()
+		if value.typ == TypeDouble {
+			g.line("  %s = call i1 @fnl_is_int_double(double %s)", result, value.name)
+			return LLVMValue{typ: TypeBool, name: result}, nil
+		}
 		g.line("  %s = call i1 @fnl_is_int(ptr %s)", result, value.name)
 		return LLVMValue{typ: TypeBool, name: result}, nil
 	case *ToIntCallExpr:
@@ -212,6 +208,10 @@ func (g *LLVMCodegen) expr(expr Expr) (LLVMValue, error) {
 			return LLVMValue{}, err
 		}
 		result := g.temp()
+		if value.typ == TypeDouble {
+			g.line("  %s = fptosi double %s to i64", result, value.name)
+			return LLVMValue{typ: TypeInt, name: result}, nil
+		}
 		g.line("  %s = call i64 @fnl_to_int(ptr %s)", result, value.name)
 		return LLVMValue{typ: TypeInt, name: result}, nil
 	case *IsDoubleCallExpr:
@@ -220,12 +220,19 @@ func (g *LLVMCodegen) expr(expr Expr) (LLVMValue, error) {
 			return LLVMValue{}, err
 		}
 		result := g.temp()
+		if value.typ == TypeInt {
+			g.line("  %s = call i1 @fnl_is_double_int(i64 %s)", result, value.name)
+			return LLVMValue{typ: TypeBool, name: result}, nil
+		}
 		g.line("  %s = call i1 @fnl_is_double(ptr %s)", result, value.name)
 		return LLVMValue{typ: TypeBool, name: result}, nil
 	case *ToDoubleCallExpr:
 		value, err := g.expr(e.Value)
 		if err != nil {
 			return LLVMValue{}, err
+		}
+		if value.typ == TypeInt {
+			return g.convert(value, TypeDouble)
 		}
 		result := g.temp()
 		g.line("  %s = call double @fnl_to_double(ptr %s)", result, value.name)
@@ -375,6 +382,17 @@ func (g *LLVMCodegen) binaryExpr(e *BinaryExpr) (LLVMValue, error) {
 			g.line("  %s = call i32 @strcmp(ptr %s, ptr %s)", cmpResult, left.name, right.name)
 			g.line("  %s = icmp %s i32 %s, 0", boolResult, llvmIntCmp(e.Op), cmpResult)
 			return LLVMValue{typ: TypeBool, name: boolResult}, nil
+		}
+		if isNumeric(left.typ) && isNumeric(right.typ) {
+			resultType := numericResult(left.typ, right.typ)
+			left, err = g.convert(left, resultType)
+			if err != nil {
+				return LLVMValue{}, err
+			}
+			right, err = g.convert(right, resultType)
+			if err != nil {
+				return LLVMValue{}, err
+			}
 		}
 		result := g.temp()
 		if left.typ == TypeDouble {
@@ -817,6 +835,41 @@ parse:
 
 zero:
   ret i64 0
+}
+
+define i1 @fnl_is_int_double(double %value) {
+entry:
+  %ordered = fcmp ord double %value, 0.000000e+00
+  br i1 %ordered, label %check_min, label %false
+
+check_min:
+  %ge_min = fcmp oge double %value, -9.223372036854776e+18
+  br i1 %ge_min, label %check_max, label %false
+
+check_max:
+  %lt_max = fcmp olt double %value, 9.223372036854776e+18
+  br i1 %lt_max, label %true, label %false
+
+true:
+  ret i1 true
+
+false:
+  ret i1 false
+}
+
+define i1 @fnl_is_double_int(i64 %value) {
+entry:
+  %as_double = sitofp i64 %value to double
+  %too_high = fcmp oge double %as_double, 9.223372036854776e+18
+  br i1 %too_high, label %false, label %round_trip
+
+round_trip:
+  %back = fptosi double %as_double to i64
+  %ok = icmp eq i64 %back, %value
+  ret i1 %ok
+
+false:
+  ret i1 false
 }
 
 define i1 @fnl_is_double(ptr %s) {

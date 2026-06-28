@@ -53,19 +53,16 @@ func (g *CCodegen) stmt(stmt Stmt) error {
 		if err != nil {
 			return err
 		}
-		value = g.convert(value, s.Type)
 		g.current()[s.Name] = CBinding{typ: s.Type}
 		g.line("%s %s = %s;", cType(s.Type), s.Name, value.code)
 	case *Assign:
-		binding, ok := g.lookup(s.Name)
-		if !ok {
+		if _, ok := g.lookup(s.Name); !ok {
 			return fmt.Errorf("internal error: unknown variable %q during C generation", s.Name)
 		}
 		value, err := g.expr(s.Value)
 		if err != nil {
 			return err
 		}
-		value = g.convert(value, binding.typ)
 		g.line("%s = %s;", s.Name, value.code)
 	case *PrintStmt:
 		value, err := g.expr(s.Value)
@@ -176,11 +173,17 @@ func (g *CCodegen) expr(expr Expr) (CExpr, error) {
 		if err != nil {
 			return CExpr{}, err
 		}
+		if value.typ == TypeDouble {
+			return CExpr{typ: TypeBool, code: "fnl_is_int_double(" + value.code + ")"}, nil
+		}
 		return CExpr{typ: TypeBool, code: "fnl_is_int(" + value.code + ")"}, nil
 	case *ToIntCallExpr:
 		value, err := g.expr(e.Value)
 		if err != nil {
 			return CExpr{}, err
+		}
+		if value.typ == TypeDouble {
+			return CExpr{typ: TypeInt, code: "(int64_t)(" + value.code + ")"}, nil
 		}
 		return CExpr{typ: TypeInt, code: "fnl_to_int(" + value.code + ")"}, nil
 	case *IsDoubleCallExpr:
@@ -188,11 +191,17 @@ func (g *CCodegen) expr(expr Expr) (CExpr, error) {
 		if err != nil {
 			return CExpr{}, err
 		}
+		if value.typ == TypeInt {
+			return CExpr{typ: TypeBool, code: "fnl_is_double_int(" + value.code + ")"}, nil
+		}
 		return CExpr{typ: TypeBool, code: "fnl_is_double(" + value.code + ")"}, nil
 	case *ToDoubleCallExpr:
 		value, err := g.expr(e.Value)
 		if err != nil {
 			return CExpr{}, err
+		}
+		if value.typ == TypeInt {
+			return g.convert(value, TypeDouble), nil
 		}
 		return CExpr{typ: TypeDouble, code: "fnl_to_double(" + value.code + ")"}, nil
 	case *UnaryExpr:
@@ -244,6 +253,11 @@ func (g *CCodegen) binaryExpr(e *BinaryExpr) (CExpr, error) {
 	case TokenEqualEqual, TokenBangEqual, TokenLess, TokenLessEqual, TokenGreater, TokenGreaterEqual:
 		if left.typ == TypeString {
 			return CExpr{typ: TypeBool, code: fmt.Sprintf("(fnl_str_cmp(%s, %s) %s 0)", left.code, right.code, cOp(e.Op))}, nil
+		}
+		if isNumeric(left.typ) && isNumeric(right.typ) {
+			resultType := numericResult(left.typ, right.typ)
+			left = g.convert(left, resultType)
+			right = g.convert(right, resultType)
 		}
 		return CExpr{typ: TypeBool, code: fmt.Sprintf("(%s %s %s)", left.code, cOp(e.Op), right.code)}, nil
 	default:
@@ -536,6 +550,14 @@ static int64_t fnl_to_int(fnl_string s) {
         return 0;
     }
     return (int64_t)strtoll(s.data, NULL, 10);
+}
+
+static int fnl_is_int_double(double value) {
+    return isfinite(value) && value >= -9223372036854775808.0 && value < 9223372036854775808.0;
+}
+
+static int fnl_is_double_int(int64_t value) {
+    return (long double)(double)value == (long double)value;
 }
 
 static int64_t fnl_pow_int(int64_t base, int64_t exponent) {

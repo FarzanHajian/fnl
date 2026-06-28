@@ -138,8 +138,12 @@ func (c *Checker) exprType(expr Expr) (Type, error) {
 		}
 		return typ, nil
 	case *StrCallExpr:
-		if _, err := c.exprType(e.Value); err != nil {
+		typ, err := c.exprType(e.Value)
+		if err != nil {
 			return "", err
+		}
+		if typ != TypeInt && typ != TypeDouble && typ != TypeBool && typ != TypeString {
+			return "", errorAt(e.Pos, "to_str expects int, double, bool, or string, got %s", typ)
 		}
 		return TypeString, nil
 	case *InputCallExpr:
@@ -149,8 +153,8 @@ func (c *Checker) exprType(expr Expr) (Type, error) {
 		if err != nil {
 			return "", err
 		}
-		if typ != TypeString {
-			return "", errorAt(e.Pos, "is_int expects string, got %s", typ)
+		if typ != TypeString && typ != TypeDouble {
+			return "", errorAt(e.Pos, "is_int expects string or double, got %s", typ)
 		}
 		return TypeBool, nil
 	case *ToIntCallExpr:
@@ -158,8 +162,8 @@ func (c *Checker) exprType(expr Expr) (Type, error) {
 		if err != nil {
 			return "", err
 		}
-		if typ != TypeString {
-			return "", errorAt(e.Pos, "to_int expects string, got %s", typ)
+		if typ != TypeString && typ != TypeDouble {
+			return "", errorAt(e.Pos, "to_int expects string or double, got %s", typ)
 		}
 		return TypeInt, nil
 	case *IsDoubleCallExpr:
@@ -167,8 +171,8 @@ func (c *Checker) exprType(expr Expr) (Type, error) {
 		if err != nil {
 			return "", err
 		}
-		if typ != TypeString {
-			return "", errorAt(e.Pos, "is_double expects string, got %s", typ)
+		if typ != TypeString && typ != TypeInt {
+			return "", errorAt(e.Pos, "is_double expects string or int, got %s", typ)
 		}
 		return TypeBool, nil
 	case *ToDoubleCallExpr:
@@ -176,8 +180,8 @@ func (c *Checker) exprType(expr Expr) (Type, error) {
 		if err != nil {
 			return "", err
 		}
-		if typ != TypeString {
-			return "", errorAt(e.Pos, "to_double expects string, got %s", typ)
+		if typ != TypeString && typ != TypeInt {
+			return "", errorAt(e.Pos, "to_double expects string or int, got %s", typ)
 		}
 		return TypeDouble, nil
 	case *UnaryExpr:
@@ -224,6 +228,9 @@ func (c *Checker) binaryType(e *BinaryExpr) (Type, error) {
 	case TokenCaret:
 		return c.numericBinaryType(e.Pos, left, right, "^")
 	case TokenEqualEqual, TokenBangEqual, TokenLess, TokenLessEqual, TokenGreater, TokenGreaterEqual:
+		if isNumeric(left) && isNumeric(right) {
+			return TypeBool, nil
+		}
 		if left != right {
 			return "", errorAt(e.Pos, "comparison requires matching types, got %s and %s", left, right)
 		}
@@ -281,7 +288,7 @@ func exprPos(expr Expr) SourcePos {
 }
 
 func canAssign(target, value Type) bool {
-	return target == value || target == TypeDouble && value == TypeInt
+	return target == value
 }
 
 func isNumeric(typ Type) bool {

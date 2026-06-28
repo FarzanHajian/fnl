@@ -160,11 +160,11 @@ Strings:
 - `print`, `println`, and `prinln` accept only `string`.
 - `print()` does not add a trailing newline.
 - `println()` and `prinln()` add a trailing newline.
-- `to_str(expression)` converts any FNL value to `string`.
-- `is_int(string)` returns whether a string can be parsed as an `int`.
-- `to_int(string)` parses a string as `int`, returning `0` if invalid.
-- `is_double(string)` returns whether a string can be parsed as a `double`.
-- `to_double(string)` parses a string as `double`, returning `0.0` if invalid.
+- `to_str(expression)` converts `int`, `double`, `bool`, or `string` to `string`.
+- `is_int(expression)` supports `string` and `double` inputs.
+- `to_int(expression)` supports `string` and `double` inputs.
+- `is_double(expression)` supports `string` and `int` inputs.
+- `to_double(expression)` supports `string` and `int` inputs.
 - `input()` waits for Enter-terminated stdin input and returns a `string`.
 - `break` is valid only inside `while` and exits the nearest enclosing loop.
 - `exit(int)` terminates the process and returns the code to the OS.
@@ -174,6 +174,7 @@ Strings:
 - `string + int` is invalid; use `string + to_str(intValue)`.
 - Math on booleans is invalid.
 - Math on strings is invalid except for `string + string`.
+- Variable declarations and assignments require an exact type match.
 - `int` mixed with `double` in `+`, `-`, `*`, `/`, `^` returns `double`.
 - `int` with `int` in `+`, `-`, `*`, `/`, `^` returns `int`.
 - `double` with `double` in `+`, `-`, `*`, `/`, `^` returns `double`.
@@ -181,11 +182,46 @@ Strings:
 - `^` follows numeric promotion and is right-associative.
 - `int` arithmetic is currently unchecked. Overflow, including overflow in `int ^ int`, follows the generated C backend behavior and should not be relied on.
 - Comparisons return `bool`.
-- Comparison operands must have matching types.
+- Comparison operands must have matching types, except mixed `int`/`double` numeric comparisons, which promote to `double` for the comparison.
 - Strings support `==`, `!=`, `<`, `<=`, `>`, and `>=`.
 - String equality and ordering compare exact Unicode code point sequences. No locale collation, case folding, or Unicode normalization is performed.
 - String ordering is lexicographic; if one string is a prefix of another, the shorter string is less.
 - Bool supports `==` and `!=`, but not ordering comparisons.
+
+### Conversion Policy
+
+This section records the explicit conversion model implemented by the semantic checker and both backends.
+
+Storage is strict: variable declarations and assignments require an exact type match. Assignment does not ask an expression to widen or convert itself. Mixed numeric operator expressions may still promote `int` to `double` when the operator expression itself requires that promotion.
+
+Examples:
+
+```fnl
+var d:double=10.0
+var ok:double=10+d
+```
+
+`10+d` is valid because the expression is mixed `int + double`, so its natural result is `double`.
+
+```fnl
+var i:int=10
+var bad:double=10+i
+```
+
+`10+i` is an `int` expression. Assigning that result to `double` would require assignment-time conversion, so it should be rejected.
+
+Conversion functions are explicit and unchecked. Guard functions are the programmer's responsibility before conversions that may fail, overflow, or produce invalid values.
+
+| Source | Destination | Function | Guard | Behavior |
+| --- | --- | --- | --- | --- |
+| `int` | `double` | `to_double(int)` | `is_double(int)` | Produces a finite `double`. Very large integers may lose integer precision because `double` cannot exactly represent every 64-bit integer. The guard returns whether the conversion can be exact and is only needed when exactness matters. |
+| `string` | `double` | `to_double(string)` | `is_double(string)` | Parses a string as a `double`. Use the guard before converting untrusted text. Unguarded invalid input is programmer error. |
+| `double` | `int` | `to_int(double)` | `is_int(double)` | Truncates toward zero. The guard should check that the value is finite and that the truncated result fits in `int`. Out-of-range values are unchecked programmer error. |
+| `string` | `int` | `to_int(string)` | `is_int(string)` | Parses a base-10 signed integer string. Use the guard before converting untrusted text. Unguarded invalid or out-of-range input is programmer error. |
+| `int` | `string` | `to_str(int)` | none | Converts to a signed decimal string. |
+| `double` | `string` | `to_str(double)` | none | Converts to a simple human-readable decimal string suitable for display. Exact digit count, trailing zero behavior, and scientific notation are not guaranteed yet. |
+
+Boolean parsing and numeric conversions are intentionally left out for now. `to_str(bool)` remains available for display. Open questions include whether text like `"true"` should parse to `bool` and whether numeric zero/nonzero should map to booleans. The current preference is to avoid those rules until a real use case appears.
 
 ## Naming Convention
 
@@ -827,6 +863,15 @@ fnlc.exe source.fnl --trace-vars
 - `--trace-vars` could extend tracing with variable values after declarations and assignments.
 - Full VS Code debugging would likely require a Debug Adapter Protocol implementation on top of GDB, LLDB, or the Visual Studio debugger.
 - A real FNL debugger will need reliable source maps, stable generated names, runtime metadata for strings and future compound types, and a way to translate native debugger values back into FNL values.
+
+## Learning Resources
+
+Useful resources for future FNL design and implementation work:
+
+- [Crafting Interpreters](https://craftinginterpreters.com/) by Robert Nystrom: practical interpreter construction, recursive descent parsing, bytecode VMs, closures, classes, and garbage collection.
+- [LLVM Kaleidoscope tutorial](https://llvm.org/docs/tutorial/): official LLVM tutorial for building a small language frontend, generating LLVM IR, adding control flow, mutable variables, object-code emission, and debug information.
+- [Nand2Tetris](https://www.nand2tetris.org/): broad systems course that builds a computer/software stack from logic gates upward; useful for understanding how compilers fit into the whole machine.
+- [Eli Bendersky's website](https://eli.thegreenplace.net/): strong articles on parsing, compilers, C/C++, LLVM, and language implementation topics.
 
 ## Useful Commands
 

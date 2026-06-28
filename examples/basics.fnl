@@ -9,7 +9,7 @@ var x:int=2
 var y:int=5
 var d:double=3.5
 var ok:bool=x<y
-var power:double=x^y
+var power:double=to_double(x^y)
 
 println("hello from " + name)
 println("my name is " + myname)
