@@ -73,9 +73,9 @@ func (g *CCodegen) stmt(stmt Stmt) error {
 			return err
 		}
 		if s.Newline {
-			g.line("printf(\"%%s\\n\", %s);", value.code)
+			g.line("fnl_println(%s);", value.code)
 		} else {
-			g.line("printf(\"%%s\", %s);", value.code)
+			g.line("fnl_print(%s);", value.code)
 		}
 	case *ExitStmt:
 		code, err := g.expr(s.Code)
@@ -243,11 +243,7 @@ func (g *CCodegen) binaryExpr(e *BinaryExpr) (CExpr, error) {
 		return CExpr{typ: TypeDouble, code: fmt.Sprintf("pow(%s, %s)", left.code, right.code)}, nil
 	case TokenEqualEqual, TokenBangEqual, TokenLess, TokenLessEqual, TokenGreater, TokenGreaterEqual:
 		if left.typ == TypeString {
-			op := "=="
-			if e.Op == TokenBangEqual {
-				op = "!="
-			}
-			return CExpr{typ: TypeBool, code: fmt.Sprintf("(strcmp(%s, %s) %s 0)", left.code, right.code, op)}, nil
+			return CExpr{typ: TypeBool, code: fmt.Sprintf("(fnl_str_cmp(%s, %s) %s 0)", left.code, right.code, cOp(e.Op))}, nil
 		}
 		return CExpr{typ: TypeBool, code: fmt.Sprintf("(%s %s %s)", left.code, cOp(e.Op), right.code)}, nil
 	default:
@@ -268,7 +264,7 @@ func (g *CCodegen) convert(value CExpr, target Type) CExpr {
 func cStrCall(value CExpr) string {
 	switch value.typ {
 	case TypeString:
-		return "fnl_strdup(" + value.code + ")"
+		return "fnl_str_copy(" + value.code + ")"
 	case TypeInt64:
 		return "fnl_str_i64(" + value.code + ")"
 	case TypeDouble:
@@ -294,7 +290,7 @@ func cType(typ Type) string {
 	case TypeBool:
 		return "int"
 	case TypeString:
-		return "char*"
+		return "fnl_string"
 	default:
 		return "int64_t"
 	}
@@ -374,16 +370,35 @@ func cRuntime() string {
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#ifdef _WIN32
+#include <io.h>
+#include <windows.h>
+#endif
 
-static char* fnl_strdup(const char* s) {
-    size_t n = strlen(s) + 1;
-    char* out = (char*)malloc(n);
-    if (!out) {
+typedef struct {
+    char* data;
+    int64_t len;
+} fnl_string;
+
+static fnl_string fnl_string_from_bytes(const char* data, size_t len) {
+    fnl_string out;
+    out.data = (char*)malloc(len + 1);
+    if (!out.data) {
         fprintf(stderr, "out of memory\n");
         exit(1);
     }
-    memcpy(out, s, n);
+    memcpy(out.data, data, len);
+    out.data[len] = '\0';
+    out.len = (int64_t)len;
     return out;
+}
+
+static fnl_string fnl_strdup(const char* s) {
+    return fnl_string_from_bytes(s, strlen(s));
+}
+
+static fnl_string fnl_str_copy(fnl_string s) {
+    return fnl_string_from_bytes(s.data, (size_t)s.len);
 }
 
 static char* fnl_format(size_t n, const char* fmt, ...) {
@@ -399,36 +414,89 @@ static char* fnl_format(size_t n, const char* fmt, ...) {
     return out;
 }
 
-static char* fnl_str_i64(int64_t value) {
-    return fnl_format(64, "%lld", (long long)value);
-}
-
-static char* fnl_str_double(double value) {
-    return fnl_format(128, "%.15g", value);
-}
-
-static char* fnl_str_bool(int value) {
-    return fnl_strdup(value ? "true" : "false");
-}
-
-static char* fnl_str_concat(const char* a, const char* b) {
-    size_t an = strlen(a);
-    size_t bn = strlen(b);
-    char* out = (char*)malloc(an + bn + 1);
-    if (!out) {
-        fprintf(stderr, "out of memory\n");
-        exit(1);
-    }
-    memcpy(out, a, an);
-    memcpy(out + an, b, bn + 1);
+static fnl_string fnl_str_from_owned_cstr(char* s) {
+    fnl_string out;
+    out.data = s;
+    out.len = (int64_t)strlen(s);
     return out;
 }
 
-static char* fnl_input(void) {
+static fnl_string fnl_str_i64(int64_t value) {
+    return fnl_str_from_owned_cstr(fnl_format(64, "%lld", (long long)value));
+}
+
+static fnl_string fnl_str_double(double value) {
+    return fnl_str_from_owned_cstr(fnl_format(128, "%.15g", value));
+}
+
+static fnl_string fnl_str_bool(int value) {
+    return fnl_strdup(value ? "true" : "false");
+}
+
+static fnl_string fnl_str_concat(fnl_string a, fnl_string b) {
+    fnl_string out;
+    out.len = a.len + b.len;
+    out.data = (char*)malloc((size_t)out.len + 1);
+    if (!out.data) {
+        fprintf(stderr, "out of memory\n");
+        exit(1);
+    }
+    memcpy(out.data, a.data, (size_t)a.len);
+    memcpy(out.data + a.len, b.data, (size_t)b.len);
+    out.data[out.len] = '\0';
+    return out;
+}
+
+static int fnl_str_cmp(fnl_string a, fnl_string b) {
+    size_t min_len = a.len < b.len ? (size_t)a.len : (size_t)b.len;
+    int cmp = memcmp(a.data, b.data, min_len);
+    if (cmp != 0) {
+        return cmp;
+    }
+    if (a.len < b.len) {
+        return -1;
+    }
+    if (a.len > b.len) {
+        return 1;
+    }
+    return 0;
+}
+
+static void fnl_print(fnl_string s) {
+#ifdef _WIN32
+    if (_isatty(_fileno(stdout))) {
+        HANDLE out = GetStdHandle(STD_OUTPUT_HANDLE);
+        if (out != INVALID_HANDLE_VALUE) {
+            int needed = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, s.data, (int)s.len, NULL, 0);
+            if (needed > 0) {
+                wchar_t* wide = (wchar_t*)malloc((size_t)needed * sizeof(wchar_t));
+                if (!wide) {
+                    fprintf(stderr, "out of memory\n");
+                    exit(1);
+                }
+                MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, s.data, (int)s.len, wide, needed);
+                DWORD written = 0;
+                WriteConsoleW(out, wide, (DWORD)needed, &written, NULL);
+                free(wide);
+                return;
+            }
+        }
+    }
+#endif
+    fwrite(s.data, 1, (size_t)s.len, stdout);
+}
+
+static void fnl_println(fnl_string s) {
+    fnl_print(s);
+    fputc('\n', stdout);
+}
+
+static fnl_string fnl_input(void) {
     size_t capacity = 64;
     size_t length = 0;
-    char* out = (char*)malloc(capacity);
-    if (!out) {
+    fnl_string out;
+    out.data = (char*)malloc(capacity);
+    if (!out.data) {
         fprintf(stderr, "out of memory\n");
         exit(1);
     }
@@ -437,36 +505,37 @@ static char* fnl_input(void) {
     while ((ch = getchar()) != EOF && ch != '\n') {
         if (length + 1 >= capacity) {
             capacity *= 2;
-            char* next = (char*)realloc(out, capacity);
+            char* next = (char*)realloc(out.data, capacity);
             if (!next) {
-                free(out);
+                free(out.data);
                 fprintf(stderr, "out of memory\n");
                 exit(1);
             }
-            out = next;
+            out.data = next;
         }
-        out[length++] = (char)ch;
+        out.data[length++] = (char)ch;
     }
-    out[length] = '\0';
+    out.data[length] = '\0';
+    out.len = (int64_t)length;
     return out;
 }
 
-static int fnl_is_int64(const char* s) {
-    if (!s || *s == '\0' || isspace((unsigned char)*s)) {
+static int fnl_is_int64(fnl_string s) {
+    if (!s.data || s.len == 0 || isspace((unsigned char)s.data[0])) {
         return 0;
     }
 
     errno = 0;
     char* end = NULL;
-    (void)strtoll(s, &end, 10);
-    return end != s && *end == '\0' && errno != ERANGE;
+    (void)strtoll(s.data, &end, 10);
+    return end != s.data && *end == '\0' && errno != ERANGE;
 }
 
-static int64_t fnl_to_int64(const char* s) {
+static int64_t fnl_to_int64(fnl_string s) {
     if (!fnl_is_int64(s)) {
         return 0;
     }
-    return (int64_t)strtoll(s, NULL, 10);
+    return (int64_t)strtoll(s.data, NULL, 10);
 }
 
 static int64_t fnl_pow_i64(int64_t base, int64_t exponent) {
@@ -487,22 +556,22 @@ static int64_t fnl_pow_i64(int64_t base, int64_t exponent) {
     return result;
 }
 
-static int fnl_is_double(const char* s) {
-    if (!s || *s == '\0' || isspace((unsigned char)*s)) {
+static int fnl_is_double(fnl_string s) {
+    if (!s.data || s.len == 0 || isspace((unsigned char)s.data[0])) {
         return 0;
     }
 
     errno = 0;
     char* end = NULL;
-    (void)strtod(s, &end);
-    return end != s && *end == '\0' && errno != ERANGE;
+    (void)strtod(s.data, &end);
+    return end != s.data && *end == '\0' && errno != ERANGE;
 }
 
-static double fnl_to_double(const char* s) {
+static double fnl_to_double(fnl_string s) {
     if (!fnl_is_double(s)) {
         return 0.0;
     }
-    return strtod(s, NULL);
+    return strtod(s.data, NULL);
 }
 
 `

@@ -4,6 +4,7 @@
 */
 
 var name:string="FNL"
+var myname:string="فرزان"
 var x:int64=2
 var y:int64=5
 var d:double=3.5
@@ -11,6 +12,7 @@ var ok:bool=x<y
 var power:double=x^y
 
 println("hello from " + name)
+println("my name is " + myname)
 println("x + y = " + to_str(x+y))
 println("d + x = " + to_str(d+x))
 println("x ^ y = " + to_str(power))

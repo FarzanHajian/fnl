@@ -372,12 +372,8 @@ func (g *LLVMCodegen) binaryExpr(e *BinaryExpr) (LLVMValue, error) {
 		if left.typ == TypeString {
 			cmpResult := g.temp()
 			boolResult := g.temp()
-			op := "eq"
-			if e.Op == TokenBangEqual {
-				op = "ne"
-			}
 			g.line("  %s = call i32 @strcmp(ptr %s, ptr %s)", cmpResult, left.name, right.name)
-			g.line("  %s = icmp %s i32 %s, 0", boolResult, op, cmpResult)
+			g.line("  %s = icmp %s i32 %s, 0", boolResult, llvmIntCmp(e.Op), cmpResult)
 			return LLVMValue{typ: TypeBool, name: boolResult}, nil
 		}
 		result := g.temp()

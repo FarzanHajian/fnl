@@ -2,6 +2,8 @@
 
 FNL is Fazan's Neat Language. This repository contains `fnlc`, a small compiler written in Go with a handwritten lexer, recursive descent parser, semantic checker, AST JSON import/export, C backend, and LLVM IR emitter.
 
+Current version: `v0.1`.
+
 ## License
 
 This software is distributed under the BSD 3-Clause License. See [LICENSE](LICENSE).
@@ -113,7 +115,7 @@ Operators:
 - Comparison: `<`, `<=`, `>`, `>=`, `==`
 - Not equal: `!=`
 - String concatenation: `string + string`
-- String equality: `string == string`, `string != string`
+- String comparison: `==`, `!=`, `<`, `<=`, `>`, `>=`
 
 Rules:
 
@@ -133,7 +135,9 @@ Rules:
 - Strings support `\n` and `\t` escapes.
 - Multiline comments use `/* ... */`.
 - There are no implicit string conversions.
-- Strings support equality and inequality comparisons, but not ordering comparisons.
+- Strings are immutable UTF-8 text. The runtime represents them internally with a data buffer and byte length; null termination is not the source of truth.
+- On Windows, generated C executables print UTF-8 strings to console output through the wide console API when stdout is a terminal.
+- String equality and ordering compare exact Unicode code point sequences. No locale collation, case folding, or Unicode normalization is performed.
 - Math on booleans and strings is not allowed.
 - `^` follows numeric promotion: `int64 ^ int64` returns `int64`; any `double` operand returns `double`.
 - `int64` arithmetic is currently unchecked. Overflow, including overflow in `int64 ^ int64`, follows the generated C backend behavior and should not be relied on.

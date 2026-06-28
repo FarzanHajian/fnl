@@ -8,6 +8,10 @@ FNL means "Fazan's Neat Language". The compiler executable is `fnlc` / `fnlc.exe
 
 Source files use the `.fnl` extension.
 
+Current project version: `v0.1`.
+
+`v0.1` marks the first named snapshot after settling the core string model: immutable UTF-8 strings, length-aware C runtime representation, and string operators for concatenation, equality, inequality, and ordering.
+
 ## Current CLI
 
 ```text
@@ -145,6 +149,10 @@ Strings:
 
 - string literals use double quotes
 - supported escapes include `\n`, `\t`, `\"`, and `\\`
+- string values are immutable UTF-8 text
+- the C runtime represents strings internally as a structure with a data buffer and authoritative byte length
+- the runtime may keep a trailing null byte for C interop, but null termination does not define the string
+- on Windows, generated C executables print UTF-8 strings through `WriteConsoleW` when stdout is a console and fall back to raw UTF-8 bytes for pipes/files
 
 ## Type Rules
 
@@ -174,7 +182,9 @@ Strings:
 - `int64` arithmetic is currently unchecked. Overflow, including overflow in `int64 ^ int64`, follows the generated C backend behavior and should not be relied on.
 - Comparisons return `bool`.
 - Comparison operands must have matching types.
-- Strings support `==` and `!=`, but not ordering comparisons.
+- Strings support `==`, `!=`, `<`, `<=`, `>`, and `>=`.
+- String equality and ordering compare exact Unicode code point sequences. No locale collation, case folding, or Unicode normalization is performed.
+- String ordering is lexicographic; if one string is a prefix of another, the shorter string is less.
 - Bool supports `==` and `!=`, but not ordering comparisons.
 
 ## Naming Convention
@@ -183,6 +193,14 @@ Strings:
 - Type names and keywords are lowercase.
 - Future user-defined functions should also use `lower_snake_case`.
 - Future constants, if added, may use `UPPER_SNAKE_CASE`.
+- Built-in and standard-library functions should prefer short, consistent prefixes rather than method-style names.
+- Keep `to_` for explicit conversions, for example `to_str`, `to_int64`, and `to_double`.
+- Keep `is_` for validation/predicate helpers, for example `is_int64` and `is_double`.
+- Use domain prefixes for standard-library families, for example `str_` for string operations, `io_` for I/O, `fs_` for filesystem operations, `path_` for path manipulation, and `math_` for math helpers.
+- Prefer `str_len(text)` over method or namespace forms like `string.len(text)` or `text.len()`.
+- Prefer general conversion names such as `to_str(value)` over fully qualified input-type names such as `double_to_str(value)`.
+- Future `str_len(text)` should return the number of Unicode code points.
+- Future `str_size(text)` should return the number of UTF-8 bytes.
 
 ## Current Operators
 
@@ -201,7 +219,7 @@ Comparison:
 String:
 
 ```text
-+
++ == != < <= > >=
 ```
 
 ## Grammar
@@ -754,6 +772,14 @@ func say = (text:string) {
 ```
 
 - In that design, a return type after the parameter list means the function returns a value. Omitting the return type means the function does not return a value. The `return` keyword remains a statement inside function bodies.
+- A future standard library should be written mostly in FNL, but it needs functions first.
+- Standard-library functions should call lower-level intrinsics for operations that ordinary FNL cannot express, such as raw printing, reading stdin, exiting the process, allocation, string internals, and platform APIs.
+- Intrinsics should be treated as a private compiler/runtime boundary, not as the normal user-facing API.
+- Current built-ins such as `print`, `println`, `input`, `to_str`, `is_int64`, `to_int64`, `is_double`, and `to_double` are effectively prelude-style functions implemented directly by the compiler/runtime for now.
+- A future cleanup should replace parser-special built-in call nodes with a general `CallExpr`, then let semantic checking resolve calls against variables/functions/built-ins.
+- The likely layering is: FNL source calls standard-library/prelude functions; standard-library FNL calls private intrinsics; backends lower intrinsics to C helpers, LLVM helpers, or platform-specific runtime code.
+- Intrinsic naming should use a reserved internal prefix such as `__fnl_`, for example `__fnl_print_raw`, `__fnl_input_line`, `__fnl_exit`, `__fnl_str_concat`, and `__fnl_str_eq`.
+- Standard-library naming should keep the prefix convention even after modules exist. Examples: `str_len`, `str_concat`, `str_compare`, `io_read_line`, `fs_exists`, and `math_sqrt`.
 - A built-in linter is a desired future compiler feature.
 
 Possible linter CLI:

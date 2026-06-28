@@ -164,7 +164,8 @@ Important type rules:
 - `%` is only valid for `int64 % int64`.
 - `^` follows numeric promotion: `int64 ^ int64` returns `int64`; any `double` operand returns `double`.
 - `int64` arithmetic is currently unchecked. Overflow follows the generated backend behavior and should not be relied on.
-- Strings support `==` and `!=`, but not ordering comparisons.
+- Strings support `==`, `!=`, `<`, `<=`, `>`, and `>=`.
+- String comparisons use exact Unicode code point sequence ordering, with no locale collation, case folding, or Unicode normalization.
 - Bool supports `==` and `!=`, but not ordering comparisons.
 
 ## Strings And Printing
@@ -202,6 +203,24 @@ String literals support:
 \"
 \\
 ```
+
+We also settled the v0 string model after a longer Unicode detour. FNL strings are immutable UTF-8 text. Under the hood, the C runtime represents a string as a small structure containing a data buffer and an authoritative byte length. A trailing null byte may exist for C interop, but null termination is not the string model.
+
+The naming convention for future string helpers is:
+
+```text
+str_len(text)   number of Unicode code points
+str_size(text)  number of UTF-8 bytes
+```
+
+For now, string ordering is available through operators only:
+
+```fnl
+"abc" < "abd"
+"same" == "same"
+```
+
+The comparison is deterministic Unicode code point sequence ordering, not locale-aware human sorting.
 
 ## Comments
 
@@ -614,7 +633,9 @@ go test ./...
 
 ## Current Status
 
-FNL is currently a small, typed, block-scoped language compiled through generated C by default.
+FNL `v0.1` is a small, typed, block-scoped language compiled through generated C by default.
+
+The `v0.1` label marks the first named snapshot after the UTF-8 string model and string ordering rules were implemented and documented.
 
 It is not yet a native machine-code compiler, but it has a strong compiler-shaped architecture:
 

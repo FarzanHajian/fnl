@@ -34,7 +34,7 @@ func TestParseAndGenerateCForLanguageFeatures(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GenerateC returned error: %v", err)
 	}
-	for _, want := range []string{"fnl_str_concat", "fnl_pow_i64", "while", "printf(\"%s\""} {
+	for _, want := range []string{"fnl_str_concat", "fnl_pow_i64", "while", "fnl_print(", "WriteConsoleW"} {
 		if !strings.Contains(csrc, want) {
 			t.Fatalf("generated C missing %q:\n%s", want, csrc)
 		}
@@ -142,7 +142,7 @@ func TestTypeRules(t *testing.T) {
 		`var x:int64=true`,
 		`var x:int64=1%2.0`,
 		`var x:string="a"+1`,
-		`var x:bool="a"<"b"`,
+		`var x:bool=true<false`,
 	}
 	for _, src := range tests {
 		if _, err := ParseAndCheckSource(src); err == nil {
@@ -193,13 +193,16 @@ func TestSemanticErrorsIncludeLineAndColumn(t *testing.T) {
 	}
 }
 
-func TestStringEqualityAndInequality(t *testing.T) {
+func TestStringComparisons(t *testing.T) {
 	prog, err := ParseAndCheckSource(strings.Join([]string{
 		`var a:string="same"`,
 		`var b:string="same"`,
 		`var c:string="other"`,
+		`var d:string="sane"`,
 		`println(to_str(a==b))`,
 		`println(to_str(a!=c))`,
+		`println(to_str(d<a))`,
+		`println(to_str(a>=b))`,
 	}, "\n"))
 	if err != nil {
 		t.Fatalf("ParseSource returned error: %v", err)
@@ -208,7 +211,7 @@ func TestStringEqualityAndInequality(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GenerateC returned error: %v", err)
 	}
-	for _, want := range []string{"strcmp(a, b) == 0", "strcmp(a, c) != 0"} {
+	for _, want := range []string{"fnl_str_cmp(a, b) == 0", "fnl_str_cmp(a, c) != 0", "fnl_str_cmp(d, a) < 0", "fnl_str_cmp(a, b) >= 0"} {
 		if !strings.Contains(csrc, want) {
 			t.Fatalf("generated C missing %q:\n%s", want, csrc)
 		}
@@ -217,7 +220,7 @@ func TestStringEqualityAndInequality(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GenerateLLVM returned error: %v", err)
 	}
-	for _, want := range []string{"declare i32 @strcmp(ptr, ptr)", "call i32 @strcmp", "icmp eq i32", "icmp ne i32"} {
+	for _, want := range []string{"declare i32 @strcmp(ptr, ptr)", "call i32 @strcmp", "icmp eq i32", "icmp ne i32", "icmp slt i32", "icmp sge i32"} {
 		if !strings.Contains(ll, want) {
 			t.Fatalf("LLVM IR missing %q:\n%s", want, ll)
 		}
@@ -325,7 +328,7 @@ func TestInputReturnsString(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GenerateC returned error: %v", err)
 	}
-	if !strings.Contains(csrc, "char* name = fnl_input();") {
+	if !strings.Contains(csrc, "fnl_string name = fnl_input();") {
 		t.Fatalf("generated C missing input call:\n%s", csrc)
 	}
 	ll, err := GenerateLLVM(prog)
@@ -538,7 +541,7 @@ func TestNewPrintAndLexingFeatures(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GenerateC returned error: %v", err)
 	}
-	for _, want := range []string{`printf("%s", s);`, `printf("%s\n", fnl_str_bool((x != y)));`, `fnl_strdup("a\n\tb")`} {
+	for _, want := range []string{`fnl_print(s);`, `fnl_println(fnl_str_bool((x != y)));`, `fnl_strdup("a\n\tb")`} {
 		if !strings.Contains(csrc, want) {
 			t.Fatalf("generated C missing %q:\n%s", want, csrc)
 		}

@@ -228,10 +228,7 @@ func (c *Checker) binaryType(e *BinaryExpr) (Type, error) {
 			return "", errorAt(e.Pos, "comparison requires matching types, got %s and %s", left, right)
 		}
 		if left == TypeString {
-			if e.Op == TokenEqualEqual || e.Op == TokenBangEqual {
-				return TypeBool, nil
-			}
-			return "", errorAt(e.Pos, "ordering comparison is not supported for string")
+			return TypeBool, nil
 		}
 		if e.Op != TokenEqualEqual && e.Op != TokenBangEqual && left == TypeBool {
 			return "", errorAt(e.Pos, "ordering comparison is not supported for bool")

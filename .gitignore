@@ -1,3 +1,5 @@
+.gocache/
+.agents/
 output/
 outputs/
-.gocache/
+work/
