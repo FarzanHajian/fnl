@@ -237,6 +237,10 @@ func (g *LLVMCodegen) expr(expr Expr) (LLVMValue, error) {
 		result := g.temp()
 		g.line("  %s = call double @fnl_to_double(ptr %s)", result, value.name)
 		return LLVMValue{typ: TypeDouble, name: result}, nil
+	case *MathRandomCallExpr:
+		result := g.temp()
+		g.line("  %s = call double @fnl_math_random()", result)
+		return LLVMValue{typ: TypeDouble, name: result}, nil
 	case *UnaryExpr:
 		value, err := g.expr(e.Value)
 		if err != nil {
@@ -625,6 +629,7 @@ func llvmRuntime() string {
 @fnl_fmt_double = private unnamed_addr constant [6 x i8] c"%.15g\00"
 @fnl_true = private unnamed_addr constant [5 x i8] c"true\00"
 @fnl_false = private unnamed_addr constant [6 x i8] c"false\00"
+@fnl_random_seeded = internal global i1 false
 
 declare ptr @malloc(i64)
 declare ptr @realloc(ptr, i64)
@@ -636,6 +641,10 @@ declare i32 @getchar()
 declare i32 @isspace(i32)
 declare i64 @strtoll(ptr, ptr, i32)
 declare double @strtod(ptr, ptr)
+declare i64 @time(ptr)
+declare i32 @clock()
+declare void @srand(i32)
+declare i32 @rand()
 
 define ptr @fnl_strdup(ptr %s) {
 entry:
@@ -918,6 +927,36 @@ parse:
 
 zero:
   ret double 0.000000e+00
+}
+
+define double @fnl_math_random() {
+entry:
+  %seeded = load i1, ptr @fnl_random_seeded
+  br i1 %seeded, label %random, label %seed
+
+seed:
+  %seconds = call i64 @time(ptr null)
+  %sec_ms = mul i64 %seconds, 1000
+  %ticks32 = call i32 @clock()
+  %ticks64 = sext i32 %ticks32 to i64
+  %ticks_ms = srem i64 %ticks64, 1000
+  %seed64 = add i64 %sec_ms, %ticks_ms
+  %seed32 = trunc i64 %seed64 to i32
+  call void @srand(i32 %seed32)
+  store i1 true, ptr @fnl_random_seeded
+  br label %random
+
+random:
+  %a32 = call i32 @rand()
+  %b32 = call i32 @rand()
+  %a64 = zext i32 %a32 to i64
+  %b64 = zext i32 %b32 to i64
+  %a_shifted = shl i64 %a64, 15
+  %mixed = xor i64 %a_shifted, %b64
+  %bucket = urem i64 %mixed, 1000000
+  %bucket_double = uitofp i64 %bucket to double
+  %scaled = fdiv double %bucket_double, 1.000000e+06
+  ret double %scaled
 }
 
 define i64 @fnl_pow_int(i64 %base_arg, i64 %exponent_arg) {

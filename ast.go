@@ -138,13 +138,18 @@ type ToDoubleCallExpr struct {
 	Value Expr
 }
 
-func (*BinaryExpr) expr()       {}
-func (*UnaryExpr) expr()        {}
-func (*LiteralExpr) expr()      {}
-func (*VarExpr) expr()          {}
-func (*StrCallExpr) expr()      {}
-func (*InputCallExpr) expr()    {}
-func (*IsIntCallExpr) expr()    {}
-func (*ToIntCallExpr) expr()    {}
-func (*IsDoubleCallExpr) expr() {}
-func (*ToDoubleCallExpr) expr() {}
+type MathRandomCallExpr struct {
+	Pos SourcePos
+}
+
+func (*BinaryExpr) expr()         {}
+func (*UnaryExpr) expr()          {}
+func (*LiteralExpr) expr()        {}
+func (*VarExpr) expr()            {}
+func (*StrCallExpr) expr()        {}
+func (*InputCallExpr) expr()      {}
+func (*IsIntCallExpr) expr()      {}
+func (*ToIntCallExpr) expr()      {}
+func (*IsDoubleCallExpr) expr()   {}
+func (*ToDoubleCallExpr) expr()   {}
+func (*MathRandomCallExpr) expr() {}

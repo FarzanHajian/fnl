@@ -137,6 +137,8 @@ func encodeExpr(expr Expr) any {
 		return map[string]any{"kind": "IsDoubleCallExpr", "pos": e.Pos, "value": encodeExpr(e.Value)}
 	case *ToDoubleCallExpr:
 		return map[string]any{"kind": "ToDoubleCallExpr", "pos": e.Pos, "value": encodeExpr(e.Value)}
+	case *MathRandomCallExpr:
+		return map[string]any{"kind": "MathRandomCallExpr", "pos": e.Pos}
 	default:
 		return map[string]any{"kind": "UnknownExpr"}
 	}
@@ -407,6 +409,14 @@ func decodeExpr(raw json.RawMessage) (Expr, error) {
 			return nil, err
 		}
 		return &ToDoubleCallExpr{Pos: pos, Value: value}, nil
+	case "MathRandomCallExpr":
+		var node struct {
+			Pos SourcePos `json:"pos"`
+		}
+		if err := json.Unmarshal(raw, &node); err != nil {
+			return nil, err
+		}
+		return &MathRandomCallExpr{Pos: node.Pos}, nil
 	default:
 		return nil, fmt.Errorf("unknown expression kind %q", kind.Kind)
 	}

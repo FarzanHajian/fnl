@@ -27,6 +27,7 @@ const (
 	TokenToInt
 	TokenIsDouble
 	TokenToDouble
+	TokenMathRandom
 	TokenTrue
 	TokenFalse
 	TokenTypeInt
@@ -92,6 +93,8 @@ func keywordKind(s string) TokenKind {
 		return TokenIsDouble
 	case "to_double":
 		return TokenToDouble
+	case "math_random":
+		return TokenMathRandom
 	case "true":
 		return TokenTrue
 	case "false":

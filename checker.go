@@ -184,6 +184,8 @@ func (c *Checker) exprType(expr Expr) (Type, error) {
 			return "", errorAt(e.Pos, "to_double expects string or int, got %s", typ)
 		}
 		return TypeDouble, nil
+	case *MathRandomCallExpr:
+		return TypeDouble, nil
 	case *UnaryExpr:
 		typ, err := c.exprType(e.Value)
 		if err != nil {
@@ -277,6 +279,8 @@ func exprPos(expr Expr) SourcePos {
 	case *IsDoubleCallExpr:
 		return e.Pos
 	case *ToDoubleCallExpr:
+		return e.Pos
+	case *MathRandomCallExpr:
 		return e.Pos
 	case *UnaryExpr:
 		return e.Pos

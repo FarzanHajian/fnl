@@ -4,5 +4,5 @@
 */
 
 print("What is your name? ")
-var name:string=input()
+var name:string = input()
 println("Hello, " + name)

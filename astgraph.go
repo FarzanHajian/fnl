@@ -130,6 +130,8 @@ func (g *astGraph) expr(expr Expr) string {
 		id := g.node("ToDoubleCallExpr")
 		g.edge(id, g.expr(e.Value), "value")
 		return id
+	case *MathRandomCallExpr:
+		return g.node("MathRandomCallExpr")
 	default:
 		return g.node("UnknownExpr")
 	}

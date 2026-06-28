@@ -374,6 +374,15 @@ func (p *Parser) parsePrimary() (Expr, error) {
 			return nil, err
 		}
 		return &ToDoubleCallExpr{Pos: pos, Value: value}, nil
+	case p.match(TokenMathRandom):
+		pos := tokenPos(p.previous())
+		if _, err := p.consume(TokenLParen, "expected '(' after math_random"); err != nil {
+			return nil, err
+		}
+		if _, err := p.consume(TokenRParen, "expected ')' after math_random"); err != nil {
+			return nil, err
+		}
+		return &MathRandomCallExpr{Pos: pos}, nil
 	case p.match(TokenInput):
 		pos := tokenPos(p.previous())
 		if _, err := p.consume(TokenLParen, "expected '(' after input"); err != nil {

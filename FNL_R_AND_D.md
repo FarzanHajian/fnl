@@ -139,6 +139,7 @@ We added:
 - `is_double()`
 - `to_double()`
 - `input()`
+- `math_random()`
 - `print()`
 - `println()`
 - `prinln()` as an accepted alias
@@ -157,6 +158,7 @@ Important type rules:
 - `is_double()` validates strings before double conversion.
 - `to_double()` converts valid double strings to `double`, returning `0.0` for invalid input.
 - `input()` reads an Enter-terminated line from stdin and returns it as a string.
+- `math_random()` returns a pseudo-random double in the range `0.0 <= value < 1.0`, seeded automatically from current time on first use.
 - `break` exits the nearest enclosing loop and is only valid inside `while`.
 - `exit(int)` terminates the program and returns the code to the OS.
 - `string + string` concatenates.
@@ -479,7 +481,7 @@ It is a TextMate grammar extension, not a full language server. That is the righ
 
 - keywords such as `var`, `if`, `elseif`, `else`, `while`, `break`, and `exit`
 - primitive types such as `int`, `double`, `bool`, and `string`
-- built-ins such as `print`, `println`, `input`, `to_str`, `is_int`, `to_int`, `is_double`, and `to_double`
+- built-ins such as `print`, `println`, `input`, `to_str`, `is_int`, `to_int`, `is_double`, `to_double`, and `math_random`
 - strings and supported escape sequences
 - multiline comments
 - numbers, operators, and identifiers

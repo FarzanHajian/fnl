@@ -204,6 +204,8 @@ func (g *CCodegen) expr(expr Expr) (CExpr, error) {
 			return g.convert(value, TypeDouble), nil
 		}
 		return CExpr{typ: TypeDouble, code: "fnl_to_double(" + value.code + ")"}, nil
+	case *MathRandomCallExpr:
+		return CExpr{typ: TypeDouble, code: "fnl_math_random()"}, nil
 	case *UnaryExpr:
 		value, err := g.expr(e.Value)
 		if err != nil {
@@ -384,6 +386,7 @@ func cRuntime() string {
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #ifdef _WIN32
 #include <io.h>
 #include <windows.h>
@@ -594,6 +597,29 @@ static double fnl_to_double(fnl_string s) {
         return 0.0;
     }
     return strtod(s.data, NULL);
+}
+
+static unsigned fnl_random_seed_from_time(void) {
+#ifdef _WIN32
+    ULONGLONG ms = GetTickCount64();
+    return (unsigned)(ms ^ (ms >> 32));
+#else
+    struct timespec ts;
+    if (timespec_get(&ts, TIME_UTC) == TIME_UTC) {
+        uint64_t ms = (uint64_t)ts.tv_sec * 1000ULL + (uint64_t)(ts.tv_nsec / 1000000L);
+        return (unsigned)(ms ^ (ms >> 32));
+    }
+    return (unsigned)time(NULL);
+#endif
+}
+
+static double fnl_math_random(void) {
+    static int seeded = 0;
+    if (!seeded) {
+        srand(fnl_random_seed_from_time());
+        seeded = 1;
+    }
+    return (double)rand() / ((double)RAND_MAX + 1.0);
 }
 
 `

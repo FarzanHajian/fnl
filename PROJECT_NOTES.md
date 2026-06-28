@@ -140,6 +140,7 @@ Statements:
 - `prinln(expression)` is accepted as an alias for `println`
 - `exit(expression)` terminates the process with an OS exit code
 - `input()` returns an Enter-terminated line from stdin as `string`
+- `math_random()` returns a pseudo-random `double` in the range `0.0 <= value < 1.0`
 
 Comments:
 
@@ -166,6 +167,7 @@ Strings:
 - `is_double(expression)` supports `string` and `int` inputs.
 - `to_double(expression)` supports `string` and `int` inputs.
 - `input()` waits for Enter-terminated stdin input and returns a `string`.
+- `math_random()` returns a pseudo-random `double` where `0.0 <= value < 1.0`. The runtime seeds it automatically on first use with current time, using millisecond precision where practical. It is intended for games and simulations, not cryptography.
 - `break` is valid only inside `while` and exits the nearest enclosing loop.
 - `exit(int)` terminates the process and returns the code to the OS.
 - Bool string conversion returns lowercase `true` or `false`.
@@ -370,6 +372,7 @@ BNF notation:
                  | <to-int-call>
                  | <is-double-call>
                  | <to-double-call>
+                 | <math-random-call>
                  | <input-call>
 
 <to-str-call> ::= "to_str" "(" <expression> ")"
@@ -381,6 +384,8 @@ BNF notation:
 <is-double-call> ::= "is_double" "(" <expression> ")"
 
 <to-double-call> ::= "to_double" "(" <expression> ")"
+
+<math-random-call> ::= "math_random" "(" ")"
 
 <input-call> ::= "input" "(" ")"
 
@@ -475,6 +480,7 @@ builtinCall    = toStrCall
                | toIntCall
                | isDoubleCall
                | toDoubleCall
+               | mathRandomCall
                | inputCall ;
 
 toStrCall      = "to_str" "(" expression ")" ;
@@ -486,6 +492,8 @@ toIntCall    = "to_int" "(" expression ")" ;
 isDoubleCall   = "is_double" "(" expression ")" ;
 
 toDoubleCall   = "to_double" "(" expression ")" ;
+
+mathRandomCall = "math_random" "(" ")" ;
 
 inputCall      = "input" "(" ")" ;
 
@@ -610,6 +618,7 @@ BNF notation:
             | <to-int-call>
             | <is-double-call>
             | <to-double-call>
+            | <math-random-call>
             | <input-call>
             | "(" <expression> ")"
 
@@ -622,6 +631,8 @@ BNF notation:
 <is-double-call> ::= "is_double" "(" <expression> ")"
 
 <to-double-call> ::= "to_double" "(" <expression> ")"
+
+<math-random-call> ::= "math_random" "(" ")"
 
 <input-call> ::= "input" "(" ")"
 
@@ -723,6 +734,7 @@ primary        = integerLiteral
                | toIntCall
                | isDoubleCall
                | toDoubleCall
+               | mathRandomCall
                | inputCall
                | "(" expression ")" ;
 
@@ -735,6 +747,8 @@ toIntCall    = "to_int" "(" expression ")" ;
 isDoubleCall   = "is_double" "(" expression ")" ;
 
 toDoubleCall   = "to_double" "(" expression ")" ;
+
+mathRandomCall = "math_random" "(" ")" ;
 
 inputCall      = "input" "(" ")" ;
 
@@ -811,7 +825,7 @@ func say = (text:string) {
 - A future standard library should be written mostly in FNL, but it needs functions first.
 - Standard-library functions should call lower-level intrinsics for operations that ordinary FNL cannot express, such as raw printing, reading stdin, exiting the process, allocation, string internals, and platform APIs.
 - Intrinsics should be treated as a private compiler/runtime boundary, not as the normal user-facing API.
-- Current built-ins such as `print`, `println`, `input`, `to_str`, `is_int`, `to_int`, `is_double`, and `to_double` are effectively prelude-style functions implemented directly by the compiler/runtime for now.
+- Current built-ins such as `print`, `println`, `input`, `to_str`, `is_int`, `to_int`, `is_double`, `to_double`, and `math_random` are effectively prelude-style functions implemented directly by the compiler/runtime for now.
 - A future cleanup should replace parser-special built-in call nodes with a general `CallExpr`, then let semantic checking resolve calls against variables/functions/built-ins.
 - The likely layering is: FNL source calls standard-library/prelude functions; standard-library FNL calls private intrinsics; backends lower intrinsics to C helpers, LLVM helpers, or platform-specific runtime code.
 - Intrinsic naming should use a reserved internal prefix such as `__fnl_`, for example `__fnl_print_raw`, `__fnl_input_line`, `__fnl_exit`, `__fnl_str_concat`, and `__fnl_str_eq`.

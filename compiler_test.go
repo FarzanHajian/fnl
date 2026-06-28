@@ -328,6 +328,50 @@ func TestDoubleParsingBuiltins(t *testing.T) {
 	}
 }
 
+func TestMathRandomBuiltin(t *testing.T) {
+	prog, err := ParseAndCheckSource(strings.Join([]string{
+		`var r:double=math_random()`,
+		`var secret:int=1+to_int(math_random()*to_double(10))`,
+		`println(to_str(r))`,
+		`println(to_str(secret))`,
+	}, "\n"))
+	if err != nil {
+		t.Fatalf("ParseSource returned error: %v", err)
+	}
+	csrc, err := GenerateC(prog)
+	if err != nil {
+		t.Fatalf("GenerateC returned error: %v", err)
+	}
+	for _, want := range []string{"fnl_math_random()", "srand(fnl_random_seed_from_time())"} {
+		if !strings.Contains(csrc, want) {
+			t.Fatalf("generated C missing %q:\n%s", want, csrc)
+		}
+	}
+	ll, err := GenerateLLVM(prog)
+	if err != nil {
+		t.Fatalf("GenerateLLVM returned error: %v", err)
+	}
+	for _, want := range []string{"define double @fnl_math_random()", "call double @fnl_math_random()", "call void @srand"} {
+		if !strings.Contains(ll, want) {
+			t.Fatalf("LLVM IR missing %q:\n%s", want, ll)
+		}
+	}
+	data, err := ExportAST(prog)
+	if err != nil {
+		t.Fatalf("ExportAST returned error: %v", err)
+	}
+	if !strings.Contains(string(data), `"kind": "MathRandomCallExpr"`) {
+		t.Fatalf("exported AST missing MathRandomCallExpr:\n%s", data)
+	}
+	imported, err := ImportAST(data)
+	if err != nil {
+		t.Fatalf("ImportAST returned error: %v", err)
+	}
+	if err := NewChecker().Check(imported); err != nil {
+		t.Fatalf("imported AST failed semantic checking: %v", err)
+	}
+}
+
 func TestNumericConversionOverloads(t *testing.T) {
 	prog, err := ParseAndCheckSource(strings.Join([]string{
 		`var d:double=12.75`,

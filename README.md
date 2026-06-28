@@ -2,8 +2,6 @@
 
 FNL is Fazan's Neat Language. This repository contains `fnlc`, a small compiler written in Go with a handwritten lexer, recursive descent parser, semantic checker, AST JSON import/export, C backend, and LLVM IR emitter.
 
-Current version: `v0.1`.
-
 ## License
 
 This software is distributed under the BSD 3-Clause License. See [LICENSE](LICENSE).
@@ -47,6 +45,7 @@ Examples:
 ```powershell
 go run . examples/hello.fnl
 go run . examples/basics.fnl -o outputs/basics.exe --emit-c --emit-llvm --emit-ast --emit-ast-graph
+go run . examples/guessme.fnl -o outputs/guessme.exe
 go run . outputs/basics.fnl.ast -o outputs/basics_from_ast.exe
 go run . examples/basics.fnl --backend=clang
 ```
@@ -81,6 +80,7 @@ var name:string="FNL"
 var x:int=2
 var y:int=5
 var ok:bool=x<y
+var secret:int=1+to_int(math_random()*to_double(100))
 
 println("hello " + name)
 
@@ -128,6 +128,7 @@ Rules:
 - `is_int()` and `to_int()` support `string` and `double` inputs.
 - `is_double()` and `to_double()` support `string` and `int` inputs.
 - `input()` waits for Enter-terminated stdin input and returns it as a `string`.
+- `math_random()` returns a pseudo-random `double` where `0.0 <= value < 1.0`. The runtime seeds it automatically on first use with current time.
 - `break` exits the nearest enclosing `while` loop.
 - `exit(int)` terminates the process and returns the code to the OS.
 - Strings support `\n` and `\t` escapes.

@@ -96,7 +96,7 @@
       "patterns": [
         {
           "name": "support.function.builtin.fnl",
-          "match": "\\b(?:print|println|prinln|input|to_str|is_int|to_int|is_double|to_double)\\b(?=\\s*\\()"
+          "match": "\\b(?:print|println|prinln|input|to_str|is_int|to_int|is_double|to_double|math_random)\\b(?=\\s*\\()"
         }
       ]
     },
