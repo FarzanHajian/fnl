@@ -155,7 +155,7 @@ func (g *CCodegen) expr(expr Expr) (CExpr, error) {
 		case TypeDouble:
 			return CExpr{typ: TypeDouble, code: cDoubleLiteral(e.Value)}, nil
 		default:
-			return CExpr{typ: TypeInt64, code: e.Value}, nil
+			return CExpr{typ: TypeInt, code: e.Value}, nil
 		}
 	case *VarExpr:
 		binding, ok := g.lookup(e.Name)
@@ -171,18 +171,18 @@ func (g *CCodegen) expr(expr Expr) (CExpr, error) {
 		return CExpr{typ: TypeString, code: cStrCall(value)}, nil
 	case *InputCallExpr:
 		return CExpr{typ: TypeString, code: "fnl_input()"}, nil
-	case *IsInt64CallExpr:
+	case *IsIntCallExpr:
 		value, err := g.expr(e.Value)
 		if err != nil {
 			return CExpr{}, err
 		}
-		return CExpr{typ: TypeBool, code: "fnl_is_int64(" + value.code + ")"}, nil
-	case *ToInt64CallExpr:
+		return CExpr{typ: TypeBool, code: "fnl_is_int(" + value.code + ")"}, nil
+	case *ToIntCallExpr:
 		value, err := g.expr(e.Value)
 		if err != nil {
 			return CExpr{}, err
 		}
-		return CExpr{typ: TypeInt64, code: "fnl_to_int64(" + value.code + ")"}, nil
+		return CExpr{typ: TypeInt, code: "fnl_to_int(" + value.code + ")"}, nil
 	case *IsDoubleCallExpr:
 		value, err := g.expr(e.Value)
 		if err != nil {
@@ -232,11 +232,11 @@ func (g *CCodegen) binaryExpr(e *BinaryExpr) (CExpr, error) {
 		right = g.convert(right, resultType)
 		return CExpr{typ: resultType, code: fmt.Sprintf("(%s %s %s)", left.code, cOp(e.Op), right.code)}, nil
 	case TokenPercent:
-		return CExpr{typ: TypeInt64, code: fmt.Sprintf("(%s %% %s)", left.code, right.code)}, nil
+		return CExpr{typ: TypeInt, code: fmt.Sprintf("(%s %% %s)", left.code, right.code)}, nil
 	case TokenCaret:
 		resultType := numericResult(left.typ, right.typ)
-		if resultType == TypeInt64 {
-			return CExpr{typ: TypeInt64, code: fmt.Sprintf("fnl_pow_i64(%s, %s)", left.code, right.code)}, nil
+		if resultType == TypeInt {
+			return CExpr{typ: TypeInt, code: fmt.Sprintf("fnl_pow_int(%s, %s)", left.code, right.code)}, nil
 		}
 		left = g.convert(left, TypeDouble)
 		right = g.convert(right, TypeDouble)
@@ -255,7 +255,7 @@ func (g *CCodegen) convert(value CExpr, target Type) CExpr {
 	if value.typ == target {
 		return value
 	}
-	if value.typ == TypeInt64 && target == TypeDouble {
+	if value.typ == TypeInt && target == TypeDouble {
 		return CExpr{typ: TypeDouble, code: "(double)(" + value.code + ")"}
 	}
 	return value
@@ -265,8 +265,8 @@ func cStrCall(value CExpr) string {
 	switch value.typ {
 	case TypeString:
 		return "fnl_str_copy(" + value.code + ")"
-	case TypeInt64:
-		return "fnl_str_i64(" + value.code + ")"
+	case TypeInt:
+		return "fnl_str_int(" + value.code + ")"
 	case TypeDouble:
 		return "fnl_str_double(" + value.code + ")"
 	case TypeBool:
@@ -280,7 +280,7 @@ func numericResult(left, right Type) Type {
 	if left == TypeDouble || right == TypeDouble {
 		return TypeDouble
 	}
-	return TypeInt64
+	return TypeInt
 }
 
 func cType(typ Type) string {
@@ -421,7 +421,7 @@ static fnl_string fnl_str_from_owned_cstr(char* s) {
     return out;
 }
 
-static fnl_string fnl_str_i64(int64_t value) {
+static fnl_string fnl_str_int(int64_t value) {
     return fnl_str_from_owned_cstr(fnl_format(64, "%lld", (long long)value));
 }
 
@@ -520,7 +520,7 @@ static fnl_string fnl_input(void) {
     return out;
 }
 
-static int fnl_is_int64(fnl_string s) {
+static int fnl_is_int(fnl_string s) {
     if (!s.data || s.len == 0 || isspace((unsigned char)s.data[0])) {
         return 0;
     }
@@ -531,14 +531,14 @@ static int fnl_is_int64(fnl_string s) {
     return end != s.data && *end == '\0' && errno != ERANGE;
 }
 
-static int64_t fnl_to_int64(fnl_string s) {
-    if (!fnl_is_int64(s)) {
+static int64_t fnl_to_int(fnl_string s) {
+    if (!fnl_is_int(s)) {
         return 0;
     }
     return (int64_t)strtoll(s.data, NULL, 10);
 }
 
-static int64_t fnl_pow_i64(int64_t base, int64_t exponent) {
+static int64_t fnl_pow_int(int64_t base, int64_t exponent) {
     if (exponent < 0) {
         return 0;
     }

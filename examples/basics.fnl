@@ -5,8 +5,8 @@
 
 var name:string="FNL"
 var myname:string="فرزان"
-var x:int64=2
-var y:int64=5
+var x:int=2
+var y:int=5
 var d:double=3.5
 var ok:bool=x<y
 var power:double=x^y
@@ -29,14 +29,14 @@ while x<5 {
     x=x+1
 }
 
-print("Enter an int64 value: ")
+print("Enter an int value: ")
 var user_input:string=input()
 
-if is_int64(user_input) {
-    var value:int64=to_int64(user_input)
+if is_int(user_input) {
+    var value:int=to_int(user_input)
     println("Parsed value: " + to_str(value))
 } else {
-    println("Invalid int64 value")
+    println("Invalid int value")
 }
 
 print("Enter a double value: ")

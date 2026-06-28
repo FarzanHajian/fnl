@@ -13,7 +13,7 @@ This document summarizes the design journey, changes we made, mistakes we hit, a
 The original language requirements were intentionally simple:
 
 - Arithmetic: `+`, `-`, `*`, `/`, parentheses
-- Variable declarations with `int64` and `double`
+- Variable declarations with `int` and `double`
 - Variable usage and assignment
 - Newline-terminated statements
 - Built-in `print()`
@@ -113,11 +113,11 @@ parses as:
 
 ## Type System Growth
 
-The language grew beyond `int64` and `double`.
+The language grew beyond `int` and `double`.
 
 Current types:
 
-- `int64`
+- `int`
 - `double`
 - `bool`
 - `string`
@@ -134,8 +134,8 @@ We added:
 - `%`
 - `^`
 - `to_str()`
-- `is_int64()`
-- `to_int64()`
+- `is_int()`
+- `to_int()`
 - `is_double()`
 - `to_double()`
 - `input()`
@@ -152,18 +152,18 @@ Important type rules:
 - `print()` does not append a newline.
 - `println()` and `prinln()` append a newline.
 - `to_str()` converts values to strings.
-- `is_int64()` validates strings before integer conversion.
-- `to_int64()` converts valid integer strings to `int64`, returning `0` for invalid input.
+- `is_int()` validates strings before integer conversion.
+- `to_int()` converts valid integer strings to `int`, returning `0` for invalid input.
 - `is_double()` validates strings before double conversion.
 - `to_double()` converts valid double strings to `double`, returning `0.0` for invalid input.
 - `input()` reads an Enter-terminated line from stdin and returns it as a string.
 - `break` exits the nearest enclosing loop and is only valid inside `while`.
-- `exit(int64)` terminates the program and returns the code to the OS.
+- `exit(int)` terminates the program and returns the code to the OS.
 - `string + string` concatenates.
 - There are no implicit string conversions.
-- `%` is only valid for `int64 % int64`.
-- `^` follows numeric promotion: `int64 ^ int64` returns `int64`; any `double` operand returns `double`.
-- `int64` arithmetic is currently unchecked. Overflow follows the generated backend behavior and should not be relied on.
+- `%` is only valid for `int % int`.
+- `^` follows numeric promotion: `int ^ int` returns `int`; any `double` operand returns `double`.
+- `int` arithmetic is currently unchecked. Overflow follows the generated backend behavior and should not be relied on.
 - Strings support `==`, `!=`, `<`, `<=`, `>`, and `>=`.
 - String comparisons use exact Unicode code point sequence ordering, with no locale collation, case folding, or Unicode normalization.
 - Bool supports `==` and `!=`, but not ordering comparisons.
@@ -393,7 +393,7 @@ Every brace block creates a new scope:
 
 ```fnl
 while x<10 {
-var y:int64=1
+var y:int=1
 println(to_str(y))
 }
 ```
@@ -403,7 +403,7 @@ println(to_str(y))
 Outer variables are visible inside inner blocks:
 
 ```fnl
-var x:int64=0
+var x:int=0
 
 while x<10 {
 x=x+1
@@ -439,13 +439,13 @@ scopes []map[string]Type
 Each map represents one scope. Entering a block pushes a new map; leaving the block pops it. When the checker sees:
 
 ```fnl
-var x:int64=1
+var x:int=1
 ```
 
 it records:
 
 ```text
-x -> int64
+x -> int
 ```
 
 When it later sees:
@@ -454,7 +454,7 @@ When it later sees:
 x=x+1
 ```
 
-it looks up `x` in the active scope stack to verify that `x` exists and to learn that it is an `int64`.
+it looks up `x` in the active scope stack to verify that `x` exists and to learn that it is an `int`.
 
 So the distinction is:
 
@@ -478,8 +478,8 @@ vscode-fnl/
 It is a TextMate grammar extension, not a full language server. That is the right size for the current project. It recognizes `.fnl` files and highlights:
 
 - keywords such as `var`, `if`, `elseif`, `else`, `while`, `break`, and `exit`
-- primitive types such as `int64`, `double`, `bool`, and `string`
-- built-ins such as `print`, `println`, `input`, `to_str`, `is_int64`, `to_int64`, `is_double`, and `to_double`
+- primitive types such as `int`, `double`, `bool`, and `string`
+- built-ins such as `print`, `println`, `input`, `to_str`, `is_int`, `to_int`, `is_double`, and `to_double`
 - strings and supported escape sequences
 - multiline comments
 - numbers, operators, and identifiers
@@ -581,11 +581,11 @@ This required changes in:
 The Fibonacci example demonstrates variables, loops, conditionals, string conversion, and printing:
 
 ```fnl
-var total_terms:int64 = 20
-var first:int64 = 0
-var second:int64 = 1
+var total_terms:int = 20
+var first:int = 0
+var second:int = 1
 
-var current_term:int64 = 1
+var current_term:int = 1
 println("Here are the first " + to_str(total_terms) + " terms of the Fibonacci Serie:")
 print(to_str(first))
 
@@ -672,7 +672,7 @@ We decided to standardize on `lower_snake_case` for FNL names. Variables and bui
 
 ```fnl
 var user_input:string=input()
-var parsed_value:int64=to_int64(user_input)
+var parsed_value:int=to_int(user_input)
 ```
 
 Keywords and type names remain lowercase. If constants are added later, `UPPER_SNAKE_CASE` is a likely convention for them.

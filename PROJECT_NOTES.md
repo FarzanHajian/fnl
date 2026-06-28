@@ -123,7 +123,7 @@ This distinction matters for the grammar: BNF and EBNF describe what token seque
 
 Types:
 
-- `int64`
+- `int`
 - `double`
 - `bool`
 - `string`
@@ -161,25 +161,25 @@ Strings:
 - `print()` does not add a trailing newline.
 - `println()` and `prinln()` add a trailing newline.
 - `to_str(expression)` converts any FNL value to `string`.
-- `is_int64(string)` returns whether a string can be parsed as an `int64`.
-- `to_int64(string)` parses a string as `int64`, returning `0` if invalid.
+- `is_int(string)` returns whether a string can be parsed as an `int`.
+- `to_int(string)` parses a string as `int`, returning `0` if invalid.
 - `is_double(string)` returns whether a string can be parsed as a `double`.
 - `to_double(string)` parses a string as `double`, returning `0.0` if invalid.
 - `input()` waits for Enter-terminated stdin input and returns a `string`.
 - `break` is valid only inside `while` and exits the nearest enclosing loop.
-- `exit(int64)` terminates the process and returns the code to the OS.
+- `exit(int)` terminates the process and returns the code to the OS.
 - Bool string conversion returns lowercase `true` or `false`.
 - `string + string` concatenates strings.
 - No implicit string conversions are allowed.
-- `string + int64` is invalid; use `string + to_str(int64Value)`.
+- `string + int` is invalid; use `string + to_str(intValue)`.
 - Math on booleans is invalid.
 - Math on strings is invalid except for `string + string`.
-- `int64` mixed with `double` in `+`, `-`, `*`, `/`, `^` returns `double`.
-- `int64` with `int64` in `+`, `-`, `*`, `/`, `^` returns `int64`.
+- `int` mixed with `double` in `+`, `-`, `*`, `/`, `^` returns `double`.
+- `int` with `int` in `+`, `-`, `*`, `/`, `^` returns `int`.
 - `double` with `double` in `+`, `-`, `*`, `/`, `^` returns `double`.
-- `%` is valid only for `int64 % int64`, returning `int64`.
+- `%` is valid only for `int % int`, returning `int`.
 - `^` follows numeric promotion and is right-associative.
-- `int64` arithmetic is currently unchecked. Overflow, including overflow in `int64 ^ int64`, follows the generated C backend behavior and should not be relied on.
+- `int` arithmetic is currently unchecked. Overflow, including overflow in `int ^ int`, follows the generated C backend behavior and should not be relied on.
 - Comparisons return `bool`.
 - Comparison operands must have matching types.
 - Strings support `==`, `!=`, `<`, `<=`, `>`, and `>=`.
@@ -194,8 +194,8 @@ Strings:
 - Future user-defined functions should also use `lower_snake_case`.
 - Future constants, if added, may use `UPPER_SNAKE_CASE`.
 - Built-in and standard-library functions should prefer short, consistent prefixes rather than method-style names.
-- Keep `to_` for explicit conversions, for example `to_str`, `to_int64`, and `to_double`.
-- Keep `is_` for validation/predicate helpers, for example `is_int64` and `is_double`.
+- Keep `to_` for explicit conversions, for example `to_str`, `to_int`, and `to_double`.
+- Keep `is_` for validation/predicate helpers, for example `is_int` and `is_double`.
 - Use domain prefixes for standard-library families, for example `str_` for string operations, `io_` for I/O, `fs_` for filesystem operations, `path_` for path manipulation, and `math_` for math helpers.
 - Prefer `str_len(text)` over method or namespace forms like `string.len(text)` or `text.len()`.
 - Prefer general conversion names such as `to_str(value)` over fully qualified input-type names such as `double_to_str(value)`.
@@ -297,7 +297,7 @@ BNF notation:
 
 <block> ::= "{" <newlines-opt> <statement-list> <newlines-opt> "}"
 
-<type> ::= "int64"
+<type> ::= "int"
          | "double"
          | "bool"
          | "string"
@@ -330,17 +330,17 @@ BNF notation:
             | "(" <expression> ")"
 
 <builtin-call> ::= <to-str-call>
-                 | <is-int64-call>
-                 | <to-int64-call>
+                 | <is-int-call>
+                 | <to-int-call>
                  | <is-double-call>
                  | <to-double-call>
                  | <input-call>
 
 <to-str-call> ::= "to_str" "(" <expression> ")"
 
-<is-int64-call> ::= "is_int64" "(" <expression> ")"
+<is-int-call> ::= "is_int" "(" <expression> ")"
 
-<to-int64-call> ::= "to_int64" "(" <expression> ")"
+<to-int-call> ::= "to_int" "(" <expression> ")"
 
 <is-double-call> ::= "is_double" "(" <expression> ")"
 
@@ -418,7 +418,7 @@ whileStatement = "while" expression block ;
 
 block          = "{" newlines? statementList newlines? "}" ;
 
-type           = "int64" | "double" | "bool" | "string" ;
+type           = "int" | "double" | "bool" | "string" ;
 
 expression     = unaryExpression | expression binaryOperator expression ;
 
@@ -435,17 +435,17 @@ primary        = integerLiteral
                | "(" expression ")" ;
 
 builtinCall    = toStrCall
-               | isInt64Call
-               | toInt64Call
+               | isIntCall
+               | toIntCall
                | isDoubleCall
                | toDoubleCall
                | inputCall ;
 
 toStrCall      = "to_str" "(" expression ")" ;
 
-isInt64Call    = "is_int64" "(" expression ")" ;
+isIntCall    = "is_int" "(" expression ")" ;
 
-toInt64Call    = "to_int64" "(" expression ")" ;
+toIntCall    = "to_int" "(" expression ")" ;
 
 isDoubleCall   = "is_double" "(" expression ")" ;
 
@@ -528,7 +528,7 @@ BNF notation:
 
 <block> ::= "{" <newlines-opt> <statement-list> <newlines-opt> "}"
 
-<type> ::= "int64"
+<type> ::= "int"
          | "double"
          | "bool"
          | "string"
@@ -570,8 +570,8 @@ BNF notation:
             | <string-literal>
             | <identifier>
             | <to-str-call>
-            | <is-int64-call>
-            | <to-int64-call>
+            | <is-int-call>
+            | <to-int-call>
             | <is-double-call>
             | <to-double-call>
             | <input-call>
@@ -579,9 +579,9 @@ BNF notation:
 
 <to-str-call> ::= "to_str" "(" <expression> ")"
 
-<is-int64-call> ::= "is_int64" "(" <expression> ")"
+<is-int-call> ::= "is_int" "(" <expression> ")"
 
-<to-int64-call> ::= "to_int64" "(" <expression> ")"
+<to-int-call> ::= "to_int" "(" <expression> ")"
 
 <is-double-call> ::= "is_double" "(" <expression> ")"
 
@@ -659,7 +659,7 @@ whileStatement = "while" expression block ;
 
 block          = "{" newlines? statementList newlines? "}" ;
 
-type           = "int64"
+type           = "int"
                | "double"
                | "bool"
                | "string" ;
@@ -683,8 +683,8 @@ primary        = integerLiteral
                | stringLiteral
                | identifier
                | toStrCall
-               | isInt64Call
-               | toInt64Call
+               | isIntCall
+               | toIntCall
                | isDoubleCall
                | toDoubleCall
                | inputCall
@@ -692,9 +692,9 @@ primary        = integerLiteral
 
 toStrCall      = "to_str" "(" expression ")" ;
 
-isInt64Call    = "is_int64" "(" expression ")" ;
+isIntCall    = "is_int" "(" expression ")" ;
 
-toInt64Call    = "to_int64" "(" expression ")" ;
+toIntCall    = "to_int" "(" expression ")" ;
 
 isDoubleCall   = "is_double" "(" expression ")" ;
 
@@ -737,7 +737,7 @@ doubleLiteral  = digit+ "." digit+ ;
 
 These are design ideas discussed but not implemented yet.
 
-- Rename `int64` to `int`, with `int` still meaning a fixed signed 64-bit integer. Matching built-ins would likely become `is_int` and `to_int`.
+- `int` is the language's only integer type for now and means a fixed signed 64-bit integer. The older `int64` spelling has been retired from the FNL source language.
 - Keep conversion functions explicit for now. Type names should not become callable C-style casts yet, because FNL does not intend to support every conversion from every type to every other type.
 - Keep `double`, `is_double`, and `to_double` for clarity unless the primitive type naming style changes more broadly.
 - Consider adding `byte` as an unsigned 8-bit storage/data type for future files, streams, and binary buffers. Initial design preference: no normal arithmetic on `byte`; possible future bit operations include `&`, `|`, `xor`, `~`, `<<`, and `>>`.
@@ -762,7 +762,7 @@ type my_struct = struct {
 - Future function declarations may follow the same declaration shape as `var` and `type`:
 
 ```fnl
-func add = (a:int64, b:int64) int64 {
+func add = (a:int, b:int) int {
     return a+b
 }
 
@@ -775,7 +775,7 @@ func say = (text:string) {
 - A future standard library should be written mostly in FNL, but it needs functions first.
 - Standard-library functions should call lower-level intrinsics for operations that ordinary FNL cannot express, such as raw printing, reading stdin, exiting the process, allocation, string internals, and platform APIs.
 - Intrinsics should be treated as a private compiler/runtime boundary, not as the normal user-facing API.
-- Current built-ins such as `print`, `println`, `input`, `to_str`, `is_int64`, `to_int64`, `is_double`, and `to_double` are effectively prelude-style functions implemented directly by the compiler/runtime for now.
+- Current built-ins such as `print`, `println`, `input`, `to_str`, `is_int`, `to_int`, `is_double`, and `to_double` are effectively prelude-style functions implemented directly by the compiler/runtime for now.
 - A future cleanup should replace parser-special built-in call nodes with a general `CallExpr`, then let semantic checking resolve calls against variables/functions/built-ins.
 - The likely layering is: FNL source calls standard-library/prelude functions; standard-library FNL calls private intrinsics; backends lower intrinsics to C helpers, LLVM helpers, or platform-specific runtime code.
 - Intrinsic naming should use a reserved internal prefix such as `__fnl_`, for example `__fnl_print_raw`, `__fnl_input_line`, `__fnl_exit`, `__fnl_str_concat`, and `__fnl_str_eq`.
@@ -805,7 +805,7 @@ Possible lint rules:
 - warn about unreachable statements after `break`, `exit`, and eventually `return`
 - suggest `println()` instead of `print("...\n")`
 - warn about obviously overflow-prone integer expressions when literals make that visible
-- warn when `to_int64()` or `to_double()` are used without a nearby validating `is_int64()` or `is_double()` guard
+- warn when `to_int()` or `to_double()` are used without a nearby validating `is_int()` or `is_double()` guard
 
 Future debugging support should start small and build toward real source-level FNL debugging.
 

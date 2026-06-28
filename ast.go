@@ -6,7 +6,7 @@ package main
 type Type string
 
 const (
-	TypeInt64  Type = "int64"
+	TypeInt    Type = "int"
 	TypeDouble Type = "double"
 	TypeBool   Type = "bool"
 	TypeString Type = "string"
@@ -118,12 +118,12 @@ type InputCallExpr struct {
 	Pos SourcePos
 }
 
-type IsInt64CallExpr struct {
+type IsIntCallExpr struct {
 	Pos   SourcePos
 	Value Expr
 }
 
-type ToInt64CallExpr struct {
+type ToIntCallExpr struct {
 	Pos   SourcePos
 	Value Expr
 }
@@ -144,7 +144,7 @@ func (*LiteralExpr) expr()      {}
 func (*VarExpr) expr()          {}
 func (*StrCallExpr) expr()      {}
 func (*InputCallExpr) expr()    {}
-func (*IsInt64CallExpr) expr()  {}
-func (*ToInt64CallExpr) expr()  {}
+func (*IsIntCallExpr) expr()    {}
+func (*ToIntCallExpr) expr()    {}
 func (*IsDoubleCallExpr) expr() {}
 func (*ToDoubleCallExpr) expr() {}

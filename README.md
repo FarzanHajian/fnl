@@ -78,8 +78,8 @@ clang --target=x86_64-w64-windows-gnu outputs/basics.ll -o outputs/basics_from_l
 
 ```text
 var name:string="FNL"
-var x:int64=2
-var y:int64=5
+var x:int=2
+var y:int=5
 var ok:bool=x<y
 
 println("hello " + name)
@@ -102,7 +102,7 @@ exit(0)
 
 Types:
 
-- `int64`
+- `int`
 - `double`
 - `bool`
 - `string`
@@ -124,14 +124,14 @@ Rules:
 - `else` is optional.
 - `print()` accepts only `string` and does not add a trailing newline.
 - `println()` accepts only `string` and adds a trailing newline. `prinln()` is also accepted as an alias.
-- `to_str()` converts `int64`, `double`, `bool`, or `string` to `string`.
-- `is_int64(string)` returns whether a string can be parsed as an `int64`.
-- `to_int64(string)` parses a string as `int64`, returning `0` if invalid. Use `is_int64()` before converting user input.
+- `to_str()` converts `int`, `double`, `bool`, or `string` to `string`.
+- `is_int(string)` returns whether a string can be parsed as an `int`.
+- `to_int(string)` parses a string as `int`, returning `0` if invalid. Use `is_int()` before converting user input.
 - `is_double(string)` returns whether a string can be parsed as a `double`.
 - `to_double(string)` parses a string as `double`, returning `0.0` if invalid. Use `is_double()` before converting user input.
 - `input()` waits for Enter-terminated stdin input and returns it as a `string`.
 - `break` exits the nearest enclosing `while` loop.
-- `exit(int64)` terminates the process and returns the code to the OS.
+- `exit(int)` terminates the process and returns the code to the OS.
 - Strings support `\n` and `\t` escapes.
 - Multiline comments use `/* ... */`.
 - There are no implicit string conversions.
@@ -139,8 +139,8 @@ Rules:
 - On Windows, generated C executables print UTF-8 strings to console output through the wide console API when stdout is a terminal.
 - String equality and ordering compare exact Unicode code point sequences. No locale collation, case folding, or Unicode normalization is performed.
 - Math on booleans and strings is not allowed.
-- `^` follows numeric promotion: `int64 ^ int64` returns `int64`; any `double` operand returns `double`.
-- `int64` arithmetic is currently unchecked. Overflow, including overflow in `int64 ^ int64`, follows the generated C backend behavior and should not be relied on.
+- `^` follows numeric promotion: `int ^ int` returns `int`; any `double` operand returns `double`.
+- `int` arithmetic is currently unchecked. Overflow, including overflow in `int ^ int`, follows the generated C backend behavior and should not be relied on.
 
 Naming convention:
 

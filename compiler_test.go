@@ -13,8 +13,8 @@ import (
 func TestParseAndGenerateCForLanguageFeatures(t *testing.T) {
 	src := strings.Join([]string{
 		`var name:string="FNL"`,
-		`var x:int64=2`,
-		`var y:int64=5`,
+		`var x:int=2`,
+		`var y:int=5`,
 		`var ok:bool=x<y`,
 		`print("hello " + name)`,
 		`if ok {`,
@@ -34,7 +34,7 @@ func TestParseAndGenerateCForLanguageFeatures(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GenerateC returned error: %v", err)
 	}
-	for _, want := range []string{"fnl_str_concat", "fnl_pow_i64", "while", "fnl_print(", "WriteConsoleW"} {
+	for _, want := range []string{"fnl_str_concat", "fnl_pow_int", "while", "fnl_print(", "WriteConsoleW"} {
 		if !strings.Contains(csrc, want) {
 			t.Fatalf("generated C missing %q:\n%s", want, csrc)
 		}
@@ -44,8 +44,8 @@ func TestParseAndGenerateCForLanguageFeatures(t *testing.T) {
 func TestGenerateLLVMForLanguageFeatures(t *testing.T) {
 	prog, err := ParseAndCheckSource(strings.Join([]string{
 		`var s:string="a"`,
-		`var x:int64=1`,
-		`var y:int64=2`,
+		`var x:int=1`,
+		`var y:int=2`,
 		`print(s + to_str(x))`,
 		`if x<y {`,
 		`print("yes")`,
@@ -67,7 +67,7 @@ func TestGenerateLLVMForLanguageFeatures(t *testing.T) {
 
 func TestASTJSONRoundTrip(t *testing.T) {
 	prog, err := ParseAndCheckSource(strings.Join([]string{
-		`var x:int64=1`,
+		`var x:int=1`,
 		`if x==1 {`,
 		`println("one")`,
 		`} elseif x==2 {`,
@@ -111,7 +111,7 @@ func TestASTJSONRoundTrip(t *testing.T) {
 
 func TestASTGraphExport(t *testing.T) {
 	prog, err := ParseAndCheckSource(strings.Join([]string{
-		`var x:int64=1`,
+		`var x:int=1`,
 		`if x==1 {`,
 		`println("one")`,
 		`} elseif x==2 {`,
@@ -139,10 +139,12 @@ func TestTypeRules(t *testing.T) {
 	tests := []string{
 		`print(1)`,
 		`if 1 {` + "\n" + `print("x")` + "\n" + `}`,
-		`var x:int64=true`,
-		`var x:int64=1%2.0`,
+		`var x:int=true`,
+		`var x:int=1%2.0`,
 		`var x:string="a"+1`,
 		`var x:bool=true<false`,
+		`var x:int64=1`,
+		`var x:int=to_int64("1")`,
 	}
 	for _, src := range tests {
 		if _, err := ParseAndCheckSource(src); err == nil {
@@ -153,7 +155,7 @@ func TestTypeRules(t *testing.T) {
 
 func TestPowerUsesNumericPromotion(t *testing.T) {
 	prog, err := ParseAndCheckSource(strings.Join([]string{
-		`var int_power:int64=2^3`,
+		`var int_power:int=2^3`,
 		`var double_power:double=2.0^3`,
 		`var promoted_power:double=2^3.0`,
 	}, "\n"))
@@ -164,7 +166,7 @@ func TestPowerUsesNumericPromotion(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GenerateC returned error: %v", err)
 	}
-	for _, want := range []string{"int64_t int_power = fnl_pow_i64(2, 3);", "double double_power = pow(2.0, (double)(3));", "double promoted_power = pow((double)(2), 3.0);"} {
+	for _, want := range []string{"int64_t int_power = fnl_pow_int(2, 3);", "double double_power = pow(2.0, (double)(3));", "double promoted_power = pow((double)(2), 3.0);"} {
 		if !strings.Contains(csrc, want) {
 			t.Fatalf("generated C missing %q:\n%s", want, csrc)
 		}
@@ -173,7 +175,7 @@ func TestPowerUsesNumericPromotion(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GenerateLLVM returned error: %v", err)
 	}
-	for _, want := range []string{"define i64 @fnl_pow_i64(i64 %base_arg, i64 %exponent_arg)", "call i64 @fnl_pow_i64", "call double @pow"} {
+	for _, want := range []string{"define i64 @fnl_pow_int(i64 %base_arg, i64 %exponent_arg)", "call i64 @fnl_pow_int", "call double @pow"} {
 		if !strings.Contains(ll, want) {
 			t.Fatalf("LLVM IR missing %q:\n%s", want, ll)
 		}
@@ -182,13 +184,13 @@ func TestPowerUsesNumericPromotion(t *testing.T) {
 
 func TestSemanticErrorsIncludeLineAndColumn(t *testing.T) {
 	_, err := ParseAndCheckSource(strings.Join([]string{
-		`var num:int64=0`,
+		`var num:int=0`,
 		`num=1.5`,
 	}, "\n"))
 	if err == nil {
 		t.Fatal("expected type error")
 	}
-	if !strings.Contains(err.Error(), `line 2:1: cannot assign double expression to int64 variable "num"`) {
+	if !strings.Contains(err.Error(), `line 2:1: cannot assign double expression to int variable "num"`) {
 		t.Fatalf("semantic error should include line and column, got: %v", err)
 	}
 }
@@ -227,13 +229,13 @@ func TestStringComparisons(t *testing.T) {
 	}
 }
 
-func TestInt64ParsingBuiltins(t *testing.T) {
+func TestIntParsingBuiltins(t *testing.T) {
 	prog, err := ParseAndCheckSource(strings.Join([]string{
 		`var good:string="123"`,
 		`var bad:string="12x"`,
-		`var ok:bool=is_int64(good)`,
-		`var not_ok:bool=is_int64(bad)`,
-		`var value:int64=to_int64(good)`,
+		`var ok:bool=is_int(good)`,
+		`var not_ok:bool=is_int(bad)`,
+		`var value:int=to_int(good)`,
 		`println(to_str(ok))`,
 		`println(to_str(not_ok))`,
 		`println(to_str(value))`,
@@ -245,7 +247,7 @@ func TestInt64ParsingBuiltins(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GenerateC returned error: %v", err)
 	}
-	for _, want := range []string{"fnl_is_int64(good)", "fnl_is_int64(bad)", "fnl_to_int64(good)"} {
+	for _, want := range []string{"fnl_is_int(good)", "fnl_is_int(bad)", "fnl_to_int(good)"} {
 		if !strings.Contains(csrc, want) {
 			t.Fatalf("generated C missing %q:\n%s", want, csrc)
 		}
@@ -254,7 +256,7 @@ func TestInt64ParsingBuiltins(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GenerateLLVM returned error: %v", err)
 	}
-	for _, want := range []string{"define i1 @fnl_is_int64(ptr %s)", "define i64 @fnl_to_int64(ptr %s)", "call i1 @fnl_is_int64", "call i64 @fnl_to_int64"} {
+	for _, want := range []string{"define i1 @fnl_is_int(ptr %s)", "define i64 @fnl_to_int(ptr %s)", "call i1 @fnl_is_int", "call i64 @fnl_to_int"} {
 		if !strings.Contains(ll, want) {
 			t.Fatalf("LLVM IR missing %q:\n%s", want, ll)
 		}
@@ -295,10 +297,10 @@ func TestDoubleParsingBuiltins(t *testing.T) {
 	}
 }
 
-func TestInt64ParsingBuiltinsRequireString(t *testing.T) {
+func TestIntParsingBuiltinsRequireString(t *testing.T) {
 	tests := []string{
-		`var ok:bool=is_int64(123)`,
-		`var value:int64=to_int64(123)`,
+		`var ok:bool=is_int(123)`,
+		`var value:int=to_int(123)`,
 		`var ok:bool=is_double(123)`,
 		`var value:double=to_double(123)`,
 	}
@@ -344,7 +346,7 @@ func TestInputReturnsString(t *testing.T) {
 
 func TestBreakAndExitStatements(t *testing.T) {
 	prog, err := ParseAndCheckSource(strings.Join([]string{
-		`var x:int64=0`,
+		`var x:int=0`,
 		`while x<10 {`,
 		`x=x+1`,
 		`if x==3 {`,
@@ -376,7 +378,7 @@ func TestBreakAndExitStatements(t *testing.T) {
 	}
 }
 
-func TestBreakRequiresLoopAndExitRequiresInt64(t *testing.T) {
+func TestBreakRequiresLoopAndExitRequiresInt(t *testing.T) {
 	tests := []string{
 		`break`,
 		`exit("no")`,
@@ -457,7 +459,7 @@ func TestMSVCToolchainCheck(t *testing.T) {
 
 func TestIfWithoutElseDoesNotConsumeFollowingStatementNewline(t *testing.T) {
 	_, err := ParseAndCheckSource(strings.Join([]string{
-		`var x:int64=0`,
+		`var x:int=0`,
 		`if x==0 {`,
 		`print("zero")`,
 		`}`,
@@ -472,7 +474,7 @@ func TestIfWithoutElseDoesNotConsumeFollowingStatementNewline(t *testing.T) {
 
 func TestElseIfBranches(t *testing.T) {
 	prog, err := ParseAndCheckSource(strings.Join([]string{
-		`var x:int64=2`,
+		`var x:int=2`,
 		`if x==1 {`,
 		`println("one")`,
 		`} elseif x==2 {`,
@@ -526,8 +528,8 @@ func TestNewPrintAndLexingFeatures(t *testing.T) {
 	src := strings.Join([]string{
 		`/* multiline`,
 		`   comment */`,
-		`var x:int64=1`,
-		`var y:int64=2`,
+		`var x:int=1`,
+		`var y:int=2`,
 		`var s:string="a\n\tb"`,
 		`print(s)`,
 		`println(to_str(x!=y))`,

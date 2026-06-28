@@ -5,13 +5,13 @@
     The code calculates square roots using the long division method
 */
 
-var number:int64 = 0
+var number:int = 0
 
 print("Enter a positive integer to calculate the root: ")
 var in:string = input()
 var invalid_input:bool = false
-if is_int64(in) {
-    number = to_int64(in)
+if is_int(in) {
+    number = to_int(in)
     if number <= 0 {
         invalid_input = true
     }
@@ -25,14 +25,14 @@ if invalid_input {
     exit(1)
 }
 
-var result:int64 = 0
-var dividend:int64 = 0
-var num:int64 = number
-var pair_count:int64 = -1
-var fractional_digits_count:int64 = 0
+var result:int = 0
+var dividend:int = 0
+var num:int = number
+var pair_count:int = -1
+var fractional_digits_count:int = 0
 
 while true {
-    var falldown:int64 = 0
+    var falldown:int = 0
     if pair_count == -1 {
         falldown = num
         pair_count = 1
@@ -46,10 +46,10 @@ while true {
     dividend = dividend * 100 + falldown
     num = num - (falldown * (100 ^ (pair_count - 1)))
 
-    var doubled_root:int64 = result * 2
-    var x:int64 = 0
+    var doubled_root:int = result * 2
+    var x:int = 0
     while x < 10 {
-        var temp:int64 = (doubled_root * 10 + x) * x
+        var temp:int = (doubled_root * 10 + x) * x
         if temp < dividend {
             if x == 9 {
                 break

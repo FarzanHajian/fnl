@@ -109,7 +109,7 @@ func (g *LLVMCodegen) stmt(stmt Stmt) error {
 			return err
 		}
 		exitCode := code.name
-		if code.typ == TypeInt64 {
+		if code.typ == TypeInt {
 			if n, err := strconv.ParseInt(code.name, 10, 32); err == nil {
 				exitCode = strconv.FormatInt(n, 10)
 			} else {
@@ -178,7 +178,7 @@ func (g *LLVMCodegen) expr(expr Expr) (LLVMValue, error) {
 		case TypeDouble:
 			return LLVMValue{typ: TypeDouble, name: llvmDoubleLiteral(e.Value)}, nil
 		default:
-			return LLVMValue{typ: TypeInt64, name: e.Value}, nil
+			return LLVMValue{typ: TypeInt, name: e.Value}, nil
 		}
 	case *VarExpr:
 		binding, ok := g.lookup(e.Name)
@@ -198,22 +198,22 @@ func (g *LLVMCodegen) expr(expr Expr) (LLVMValue, error) {
 		result := g.temp()
 		g.line("  %s = call ptr @fnl_input()", result)
 		return LLVMValue{typ: TypeString, name: result}, nil
-	case *IsInt64CallExpr:
+	case *IsIntCallExpr:
 		value, err := g.expr(e.Value)
 		if err != nil {
 			return LLVMValue{}, err
 		}
 		result := g.temp()
-		g.line("  %s = call i1 @fnl_is_int64(ptr %s)", result, value.name)
+		g.line("  %s = call i1 @fnl_is_int(ptr %s)", result, value.name)
 		return LLVMValue{typ: TypeBool, name: result}, nil
-	case *ToInt64CallExpr:
+	case *ToIntCallExpr:
 		value, err := g.expr(e.Value)
 		if err != nil {
 			return LLVMValue{}, err
 		}
 		result := g.temp()
-		g.line("  %s = call i64 @fnl_to_int64(ptr %s)", result, value.name)
-		return LLVMValue{typ: TypeInt64, name: result}, nil
+		g.line("  %s = call i64 @fnl_to_int(ptr %s)", result, value.name)
+		return LLVMValue{typ: TypeInt, name: result}, nil
 	case *IsDoubleCallExpr:
 		value, err := g.expr(e.Value)
 		if err != nil {
@@ -356,13 +356,13 @@ func (g *LLVMCodegen) binaryExpr(e *BinaryExpr) (LLVMValue, error) {
 	case TokenPercent:
 		result := g.temp()
 		g.line("  %s = srem i64 %s, %s", result, left.name, right.name)
-		return LLVMValue{typ: TypeInt64, name: result}, nil
+		return LLVMValue{typ: TypeInt, name: result}, nil
 	case TokenCaret:
 		resultType := numericResult(left.typ, right.typ)
 		result := g.temp()
-		if resultType == TypeInt64 {
-			g.line("  %s = call i64 @fnl_pow_i64(i64 %s, i64 %s)", result, left.name, right.name)
-			return LLVMValue{typ: TypeInt64, name: result}, nil
+		if resultType == TypeInt {
+			g.line("  %s = call i64 @fnl_pow_int(i64 %s, i64 %s)", result, left.name, right.name)
+			return LLVMValue{typ: TypeInt, name: result}, nil
 		}
 		left, _ = g.convert(left, TypeDouble)
 		right, _ = g.convert(right, TypeDouble)
@@ -411,8 +411,8 @@ func (g *LLVMCodegen) strCall(value LLVMValue) LLVMValue {
 	}
 	result := g.temp()
 	switch value.typ {
-	case TypeInt64:
-		g.line("  %s = call ptr @fnl_str_i64(i64 %s)", result, value.name)
+	case TypeInt:
+		g.line("  %s = call ptr @fnl_str_int(i64 %s)", result, value.name)
 	case TypeDouble:
 		g.line("  %s = call ptr @fnl_str_double(double %s)", result, value.name)
 	case TypeBool:
@@ -425,7 +425,7 @@ func (g *LLVMCodegen) convert(value LLVMValue, target Type) (LLVMValue, error) {
 	if value.typ == target {
 		return value, nil
 	}
-	if value.typ == TypeInt64 && target == TypeDouble {
+	if value.typ == TypeInt && target == TypeDouble {
 		result := g.temp()
 		g.line("  %s = sitofp i64 %s to double", result, value.name)
 		return LLVMValue{typ: TypeDouble, name: result}, nil
@@ -603,7 +603,7 @@ func llvmStringBytes(value string) string {
 
 func llvmRuntime() string {
 	return `
-@fnl_fmt_i64 = private unnamed_addr constant [5 x i8] c"%lld\00"
+@fnl_fmt_int = private unnamed_addr constant [5 x i8] c"%lld\00"
 @fnl_fmt_double = private unnamed_addr constant [6 x i8] c"%.15g\00"
 @fnl_true = private unnamed_addr constant [5 x i8] c"true\00"
 @fnl_false = private unnamed_addr constant [6 x i8] c"false\00"
@@ -636,7 +636,7 @@ copy:
   ret ptr %out
 }
 
-define ptr @fnl_str_i64(i64 %value) {
+define ptr @fnl_str_int(i64 %value) {
 entry:
   %out = call ptr @malloc(i64 64)
   %is_null = icmp eq ptr %out, null
@@ -647,7 +647,7 @@ oom:
   unreachable
 
 format:
-  %ignored = call i32 (ptr, i64, ptr, ...) @snprintf(ptr %out, i64 64, ptr getelementptr inbounds ([5 x i8], ptr @fnl_fmt_i64, i64 0, i64 0), i64 %value)
+  %ignored = call i32 (ptr, i64, ptr, ...) @snprintf(ptr %out, i64 64, ptr getelementptr inbounds ([5 x i8], ptr @fnl_fmt_int, i64 0, i64 0), i64 %value)
   ret ptr %out
 }
 
@@ -771,7 +771,7 @@ finish:
   ret ptr %final_out
 }
 
-define i1 @fnl_is_int64(ptr %s) {
+define i1 @fnl_is_int(ptr %s) {
 entry:
   %is_null = icmp eq ptr %s, null
   br i1 %is_null, label %false, label %check_first
@@ -806,9 +806,9 @@ false:
   ret i1 false
 }
 
-define i64 @fnl_to_int64(ptr %s) {
+define i64 @fnl_to_int(ptr %s) {
 entry:
-  %ok = call i1 @fnl_is_int64(ptr %s)
+  %ok = call i1 @fnl_is_int(ptr %s)
   br i1 %ok, label %parse, label %zero
 
 parse:
@@ -867,7 +867,7 @@ zero:
   ret double 0.000000e+00
 }
 
-define i64 @fnl_pow_i64(i64 %base_arg, i64 %exponent_arg) {
+define i64 @fnl_pow_int(i64 %base_arg, i64 %exponent_arg) {
 entry:
   %is_negative = icmp slt i64 %exponent_arg, 0
   br i1 %is_negative, label %return_zero, label %init

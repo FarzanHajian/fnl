@@ -129,10 +129,10 @@ func encodeExpr(expr Expr) any {
 		return map[string]any{"kind": "ToStrCallExpr", "pos": e.Pos, "value": encodeExpr(e.Value)}
 	case *InputCallExpr:
 		return map[string]any{"kind": "InputCallExpr", "pos": e.Pos}
-	case *IsInt64CallExpr:
-		return map[string]any{"kind": "IsInt64CallExpr", "pos": e.Pos, "value": encodeExpr(e.Value)}
-	case *ToInt64CallExpr:
-		return map[string]any{"kind": "ToInt64CallExpr", "pos": e.Pos, "value": encodeExpr(e.Value)}
+	case *IsIntCallExpr:
+		return map[string]any{"kind": "IsIntCallExpr", "pos": e.Pos, "value": encodeExpr(e.Value)}
+	case *ToIntCallExpr:
+		return map[string]any{"kind": "ToIntCallExpr", "pos": e.Pos, "value": encodeExpr(e.Value)}
 	case *IsDoubleCallExpr:
 		return map[string]any{"kind": "IsDoubleCallExpr", "pos": e.Pos, "value": encodeExpr(e.Value)}
 	case *ToDoubleCallExpr:
@@ -383,18 +383,18 @@ func decodeExpr(raw json.RawMessage) (Expr, error) {
 			return nil, err
 		}
 		return &InputCallExpr{Pos: node.Pos}, nil
-	case "IsInt64CallExpr":
+	case "IsIntCallExpr":
 		value, pos, err := decodeSingleValueExpr(raw)
 		if err != nil {
 			return nil, err
 		}
-		return &IsInt64CallExpr{Pos: pos, Value: value}, nil
-	case "ToInt64CallExpr":
+		return &IsIntCallExpr{Pos: pos, Value: value}, nil
+	case "ToIntCallExpr":
 		value, pos, err := decodeSingleValueExpr(raw)
 		if err != nil {
 			return nil, err
 		}
-		return &ToInt64CallExpr{Pos: pos, Value: value}, nil
+		return &ToIntCallExpr{Pos: pos, Value: value}, nil
 	case "IsDoubleCallExpr":
 		value, pos, err := decodeSingleValueExpr(raw)
 		if err != nil {

@@ -5,7 +5,7 @@
     FizzBuzz in FNL
 */
 
-var i:int64 = 1
+var i:int = 1
 while i <= 100 {
     if i % 15 == 0 {
         println("FizzBuzz")

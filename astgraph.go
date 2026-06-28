@@ -114,12 +114,12 @@ func (g *astGraph) expr(expr Expr) string {
 		return id
 	case *InputCallExpr:
 		return g.node("InputCallExpr")
-	case *IsInt64CallExpr:
-		id := g.node("IsInt64CallExpr")
+	case *IsIntCallExpr:
+		id := g.node("IsIntCallExpr")
 		g.edge(id, g.expr(e.Value), "value")
 		return id
-	case *ToInt64CallExpr:
-		id := g.node("ToInt64CallExpr")
+	case *ToIntCallExpr:
+		id := g.node("ToIntCallExpr")
 		g.edge(id, g.expr(e.Value), "value")
 		return id
 	case *IsDoubleCallExpr:

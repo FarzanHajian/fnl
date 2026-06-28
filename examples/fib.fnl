@@ -5,13 +5,13 @@
     Fibonacci serie generator written entirely in FNL
 */
 
-var total_terms:int64 = 20
-var first:int64 = 0
-var second:int64 = 1
+var total_terms:int = 20
+var first:int = 0
+var second:int = 1
 
 println("Here are the first " + to_str(total_terms) + " terms of the Fibonacci Serie:")
 
-var current_term:int64 = 1
+var current_term:int = 1
 print (to_str(first))
 
 if total_terms > 1 {

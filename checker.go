@@ -65,8 +65,8 @@ func (c *Checker) checkStmt(stmt Stmt) error {
 		if err != nil {
 			return err
 		}
-		if typ != TypeInt64 {
-			return errorAt(s.Pos, "exit expects int64, got %s", typ)
+		if typ != TypeInt {
+			return errorAt(s.Pos, "exit expects int, got %s", typ)
 		}
 	case *BreakStmt:
 		if c.loopDepth == 0 {
@@ -144,24 +144,24 @@ func (c *Checker) exprType(expr Expr) (Type, error) {
 		return TypeString, nil
 	case *InputCallExpr:
 		return TypeString, nil
-	case *IsInt64CallExpr:
+	case *IsIntCallExpr:
 		typ, err := c.exprType(e.Value)
 		if err != nil {
 			return "", err
 		}
 		if typ != TypeString {
-			return "", errorAt(e.Pos, "is_int64 expects string, got %s", typ)
+			return "", errorAt(e.Pos, "is_int expects string, got %s", typ)
 		}
 		return TypeBool, nil
-	case *ToInt64CallExpr:
+	case *ToIntCallExpr:
 		typ, err := c.exprType(e.Value)
 		if err != nil {
 			return "", err
 		}
 		if typ != TypeString {
-			return "", errorAt(e.Pos, "to_int64 expects string, got %s", typ)
+			return "", errorAt(e.Pos, "to_int expects string, got %s", typ)
 		}
-		return TypeInt64, nil
+		return TypeInt, nil
 	case *IsDoubleCallExpr:
 		typ, err := c.exprType(e.Value)
 		if err != nil {
@@ -185,7 +185,7 @@ func (c *Checker) exprType(expr Expr) (Type, error) {
 		if err != nil {
 			return "", err
 		}
-		if typ != TypeInt64 && typ != TypeDouble {
+		if typ != TypeInt && typ != TypeDouble {
 			return "", errorAt(e.Pos, "unary '-' expects numeric expression, got %s", typ)
 		}
 		return typ, nil
@@ -217,10 +217,10 @@ func (c *Checker) binaryType(e *BinaryExpr) (Type, error) {
 	case TokenMinus, TokenStar, TokenSlash:
 		return c.numericBinaryType(e.Pos, left, right, opName(e.Op))
 	case TokenPercent:
-		if left == TypeInt64 && right == TypeInt64 {
-			return TypeInt64, nil
+		if left == TypeInt && right == TypeInt {
+			return TypeInt, nil
 		}
-		return "", errorAt(e.Pos, "%% requires int64 %% int64, got %s %% %s", left, right)
+		return "", errorAt(e.Pos, "%% requires int %% int, got %s %% %s", left, right)
 	case TokenCaret:
 		return c.numericBinaryType(e.Pos, left, right, "^")
 	case TokenEqualEqual, TokenBangEqual, TokenLess, TokenLessEqual, TokenGreater, TokenGreaterEqual:
@@ -246,7 +246,7 @@ func (c *Checker) numericBinaryType(pos SourcePos, left, right Type, op string) 
 	if left == TypeDouble || right == TypeDouble {
 		return TypeDouble, nil
 	}
-	return TypeInt64, nil
+	return TypeInt, nil
 }
 
 func errorAt(pos SourcePos, format string, args ...any) error {
@@ -263,9 +263,9 @@ func exprPos(expr Expr) SourcePos {
 		return e.Pos
 	case *InputCallExpr:
 		return e.Pos
-	case *IsInt64CallExpr:
+	case *IsIntCallExpr:
 		return e.Pos
-	case *ToInt64CallExpr:
+	case *ToIntCallExpr:
 		return e.Pos
 	case *IsDoubleCallExpr:
 		return e.Pos
@@ -281,11 +281,11 @@ func exprPos(expr Expr) SourcePos {
 }
 
 func canAssign(target, value Type) bool {
-	return target == value || target == TypeDouble && value == TypeInt64
+	return target == value || target == TypeDouble && value == TypeInt
 }
 
 func isNumeric(typ Type) bool {
-	return typ == TypeInt64 || typ == TypeDouble
+	return typ == TypeInt || typ == TypeDouble
 }
 
 func opName(kind TokenKind) string {

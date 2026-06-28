@@ -88,7 +88,7 @@
       "patterns": [
         {
           "name": "storage.type.primitive.fnl",
-          "match": "\\b(?:int64|double|bool|string)\\b"
+          "match": "\\b(?:int|double|bool|string)\\b"
         }
       ]
     },
@@ -96,7 +96,7 @@
       "patterns": [
         {
           "name": "support.function.builtin.fnl",
-          "match": "\\b(?:print|println|prinln|input|to_str|is_int64|to_int64|is_double|to_double)\\b(?=\\s*\\()"
+          "match": "\\b(?:print|println|prinln|input|to_str|is_int|to_int|is_double|to_double)\\b(?=\\s*\\()"
         }
       ]
     },

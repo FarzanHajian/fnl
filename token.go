@@ -23,13 +23,13 @@ const (
 	TokenExit
 	TokenStr
 	TokenInput
-	TokenIsInt64
-	TokenToInt64
+	TokenIsInt
+	TokenToInt
 	TokenIsDouble
 	TokenToDouble
 	TokenTrue
 	TokenFalse
-	TokenTypeInt64
+	TokenTypeInt
 	TokenTypeDouble
 	TokenTypeBool
 	TokenTypeString
@@ -84,10 +84,10 @@ func keywordKind(s string) TokenKind {
 		return TokenStr
 	case "input":
 		return TokenInput
-	case "is_int64":
-		return TokenIsInt64
-	case "to_int64":
-		return TokenToInt64
+	case "is_int":
+		return TokenIsInt
+	case "to_int":
+		return TokenToInt
 	case "is_double":
 		return TokenIsDouble
 	case "to_double":
@@ -96,8 +96,8 @@ func keywordKind(s string) TokenKind {
 		return TokenTrue
 	case "false":
 		return TokenFalse
-	case "int64":
-		return TokenTypeInt64
+	case "int":
+		return TokenTypeInt
 	case "double":
 		return TokenTypeDouble
 	case "bool":

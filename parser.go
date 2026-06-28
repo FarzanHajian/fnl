@@ -223,8 +223,8 @@ func (p *Parser) parseBlock(name string) ([]Stmt, error) {
 func (p *Parser) parseType() (Type, error) {
 	tok := p.advance()
 	switch tok.Kind {
-	case TokenTypeInt64:
-		return TypeInt64, nil
+	case TokenTypeInt:
+		return TypeInt, nil
 	case TokenTypeDouble:
 		return TypeDouble, nil
 	case TokenTypeBool:
@@ -232,7 +232,7 @@ func (p *Parser) parseType() (Type, error) {
 	case TokenTypeString:
 		return TypeString, nil
 	default:
-		return "", p.errorAt(tok, "expected type int64, double, bool, or string")
+		return "", p.errorAt(tok, "expected type int, double, bool, or string")
 	}
 }
 
@@ -322,7 +322,7 @@ func (p *Parser) parseUnary() (Expr, error) {
 func (p *Parser) parsePrimary() (Expr, error) {
 	switch {
 	case p.match(TokenInt):
-		return &LiteralExpr{Pos: tokenPos(p.previous()), Value: p.previous().Lexeme, Type: TypeInt64}, nil
+		return &LiteralExpr{Pos: tokenPos(p.previous()), Value: p.previous().Lexeme, Type: TypeInt}, nil
 	case p.match(TokenDouble):
 		return &LiteralExpr{Pos: tokenPos(p.previous()), Value: p.previous().Lexeme, Type: TypeDouble}, nil
 	case p.match(TokenString):
@@ -346,20 +346,20 @@ func (p *Parser) parsePrimary() (Expr, error) {
 			return nil, err
 		}
 		return &StrCallExpr{Pos: pos, Value: value}, nil
-	case p.match(TokenIsInt64):
+	case p.match(TokenIsInt):
 		pos := tokenPos(p.previous())
-		value, err := p.parseSingleArgCall("is_int64")
+		value, err := p.parseSingleArgCall("is_int")
 		if err != nil {
 			return nil, err
 		}
-		return &IsInt64CallExpr{Pos: pos, Value: value}, nil
-	case p.match(TokenToInt64):
+		return &IsIntCallExpr{Pos: pos, Value: value}, nil
+	case p.match(TokenToInt):
 		pos := tokenPos(p.previous())
-		value, err := p.parseSingleArgCall("to_int64")
+		value, err := p.parseSingleArgCall("to_int")
 		if err != nil {
 			return nil, err
 		}
-		return &ToInt64CallExpr{Pos: pos, Value: value}, nil
+		return &ToIntCallExpr{Pos: pos, Value: value}, nil
 	case p.match(TokenIsDouble):
 		pos := tokenPos(p.previous())
 		value, err := p.parseSingleArgCall("is_double")
