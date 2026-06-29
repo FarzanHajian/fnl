@@ -782,6 +782,7 @@ doubleLiteral  = digit+ "." digit+ ;
 - AST graph files use Graphviz DOT syntax and the `.fnl.ast.dot` extension.
 - Variables are block scoped. Every `{ ... }` block creates a new scope.
 - A variable declared inside a loop body is visible only inside that loop body.
+- User-defined symbols are mangled in backend output. A source variable named `signed`, `printf`, or any other C/backend-sensitive name remains legal FNL, but code generators emit unique names such as `fnl_v0_signed`. The numeric part is a declaration ID, so shadowed variables also receive distinct backend identities. Future functions should use the same principle with a function-oriented prefix.
 
 ## Future Design Notes
 

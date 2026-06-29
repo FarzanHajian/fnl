@@ -10,8 +10,9 @@ import (
 )
 
 type LLVMBinding struct {
-	typ Type
-	ptr string
+	typ  Type
+	name string
+	ptr  string
 }
 
 type LLVMValue struct {
@@ -25,6 +26,7 @@ type LLVMCodegen struct {
 	globals      strings.Builder
 	tempID       int
 	labelID      int
+	symbolSeq    int
 	loopEndStack []string
 	terminated   bool
 }
@@ -75,10 +77,10 @@ func (g *LLVMCodegen) stmt(stmt Stmt) error {
 		if err != nil {
 			return err
 		}
-		ptr := g.temp()
+		ptr := g.newVarName(s.Name)
 		g.line("  %s = alloca %s", ptr, llvmType(s.Type))
 		g.line("  store %s %s, ptr %s", llvmType(s.Type), value.name, ptr)
-		g.current()[s.Name] = LLVMBinding{typ: s.Type, ptr: ptr}
+		g.current()[s.Name] = LLVMBinding{typ: s.Type, name: ptr, ptr: ptr}
 	case *Assign:
 		binding, ok := g.lookup(s.Name)
 		if !ok {
@@ -480,6 +482,12 @@ func (g *LLVMCodegen) newLabel(prefix string) string {
 	label := fmt.Sprintf("%s.%d", prefix, g.labelID)
 	g.labelID++
 	return label
+}
+
+func (g *LLVMCodegen) newVarName(sourceName string) string {
+	name := fmt.Sprintf("%%fnl_v%d_%s", g.symbolSeq, sanitizeBackendName(sourceName))
+	g.symbolSeq++
+	return name
 }
 
 func (g *LLVMCodegen) label(name string) {

@@ -633,6 +633,22 @@ Run tests with:
 go test ./...
 ```
 
+## Backend Name Mangling
+
+One practical compiler lesson came from a small typo while writing a Pi program. A variable intended to be named `sign` was accidentally named `signed`. FNL accepted the name, but the generated C backend saw `signed`, which is a C keyword, and compilation failed.
+
+The fix was not to forbid every C keyword in FNL. That would leak backend details into the source language and would still miss other collisions such as C library names, platform macros, runtime helper names, or future backend-specific reserved names.
+
+Instead, FNL source names and backend names are now separate namespaces. Every user variable emitted by a backend receives a generated name with a unique declaration ID:
+
+```text
+fnl_v0_signed
+fnl_v1_total
+fnl_v2_signed
+```
+
+The source suffix keeps generated code somewhat readable, while the numeric ID guarantees that shadowed variables are distinct. This decision should also guide future function emission: user-defined FNL functions should receive generated backend names too, instead of being emitted directly as raw source identifiers.
+
 ## Current Status
 
 FNL `v0.1` is a small, typed, block-scoped language compiled through generated C by default.

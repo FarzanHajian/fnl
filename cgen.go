@@ -10,7 +10,8 @@ import (
 )
 
 type CBinding struct {
-	typ Type
+	typ  Type
+	name string
 }
 
 type CExpr struct {
@@ -19,8 +20,9 @@ type CExpr struct {
 }
 
 type CCodegen struct {
-	scopes []map[string]CBinding
-	out    strings.Builder
+	scopes    []map[string]CBinding
+	out       strings.Builder
+	symbolSeq int
 }
 
 func NewCCodegen() *CCodegen {
@@ -53,17 +55,19 @@ func (g *CCodegen) stmt(stmt Stmt) error {
 		if err != nil {
 			return err
 		}
-		g.current()[s.Name] = CBinding{typ: s.Type}
-		g.line("%s %s = %s;", cType(s.Type), s.Name, value.code)
+		name := g.newVarName(s.Name)
+		g.current()[s.Name] = CBinding{typ: s.Type, name: name}
+		g.line("%s %s = %s;", cType(s.Type), name, value.code)
 	case *Assign:
-		if _, ok := g.lookup(s.Name); !ok {
+		binding, ok := g.lookup(s.Name)
+		if !ok {
 			return fmt.Errorf("internal error: unknown variable %q during C generation", s.Name)
 		}
 		value, err := g.expr(s.Value)
 		if err != nil {
 			return err
 		}
-		g.line("%s = %s;", s.Name, value.code)
+		g.line("%s = %s;", binding.name, value.code)
 	case *PrintStmt:
 		value, err := g.expr(s.Value)
 		if err != nil {
@@ -159,7 +163,7 @@ func (g *CCodegen) expr(expr Expr) (CExpr, error) {
 		if !ok {
 			return CExpr{}, fmt.Errorf("internal error: unknown variable %q during C generation", e.Name)
 		}
-		return CExpr{typ: binding.typ, code: e.Name}, nil
+		return CExpr{typ: binding.typ, code: binding.name}, nil
 	case *StrCallExpr:
 		value, err := g.expr(e.Value)
 		if err != nil {
@@ -348,6 +352,12 @@ func cDoubleLiteral(value string) string {
 
 func quoteCString(s string) string {
 	return strconv.Quote(s)
+}
+
+func (g *CCodegen) newVarName(sourceName string) string {
+	name := fmt.Sprintf("fnl_v%d_%s", g.symbolSeq, sanitizeBackendName(sourceName))
+	g.symbolSeq++
+	return name
 }
 
 func (g *CCodegen) line(format string, args ...any) {

@@ -104,7 +104,7 @@ func TestASTJSONRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GenerateC returned error: %v", err)
 	}
-	if !strings.Contains(csrc, "} else if ((x == 2)) {") {
+	if !strings.Contains(csrc, "} else if ((fnl_v0_x == 2)) {") {
 		t.Fatalf("generated C from imported AST missing elseif:\n%s", csrc)
 	}
 }
@@ -167,7 +167,7 @@ func TestPowerUsesNumericPromotion(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GenerateC returned error: %v", err)
 	}
-	for _, want := range []string{"int64_t int_power = fnl_pow_int(2, 3);", "double double_power = pow(2.0, (double)(3));", "double promoted_power = pow((double)(2), 3.0);"} {
+	for _, want := range []string{"int64_t fnl_v0_int_power = fnl_pow_int(2, 3);", "double fnl_v1_double_power = pow(2.0, (double)(3));", "double fnl_v2_promoted_power = pow((double)(2), 3.0);"} {
 		if !strings.Contains(csrc, want) {
 			t.Fatalf("generated C missing %q:\n%s", want, csrc)
 		}
@@ -204,9 +204,55 @@ func TestStrictAssignmentButMixedNumericExpressionsPromote(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GenerateC returned error: %v", err)
 	}
-	for _, want := range []string{"double result = ((double)(10) + d);", "int ok = ((double)(10) < d);"} {
+	for _, want := range []string{"double fnl_v1_result = ((double)(10) + fnl_v0_d);", "int fnl_v2_ok = ((double)(10) < fnl_v0_d);"} {
 		if !strings.Contains(csrc, want) {
 			t.Fatalf("generated C missing %q:\n%s", want, csrc)
+		}
+	}
+}
+
+func TestBackendManglesUserVariableNames(t *testing.T) {
+	prog, err := ParseAndCheckSource(strings.Join([]string{
+		`var signed:int=1`,
+		`var printf:int=2`,
+		`if true {`,
+		`var signed:int=3`,
+		`println(to_str(signed))`,
+		`}`,
+		`println(to_str(signed+printf))`,
+	}, "\n"))
+	if err != nil {
+		t.Fatalf("ParseSource returned error: %v", err)
+	}
+	csrc, err := GenerateC(prog)
+	if err != nil {
+		t.Fatalf("GenerateC returned error: %v", err)
+	}
+	for _, want := range []string{
+		"int64_t fnl_v0_signed = 1;",
+		"int64_t fnl_v1_printf = 2;",
+		"int64_t fnl_v2_signed = 3;",
+		"fnl_str_int(fnl_v2_signed)",
+		"fnl_str_int((fnl_v0_signed + fnl_v1_printf))",
+	} {
+		if !strings.Contains(csrc, want) {
+			t.Fatalf("generated C missing %q:\n%s", want, csrc)
+		}
+	}
+	if strings.Contains(csrc, "int64_t signed =") || strings.Contains(csrc, "int64_t printf =") {
+		t.Fatalf("generated C should not emit raw source names:\n%s", csrc)
+	}
+	ll, err := GenerateLLVM(prog)
+	if err != nil {
+		t.Fatalf("GenerateLLVM returned error: %v", err)
+	}
+	for _, want := range []string{
+		"%fnl_v0_signed = alloca i64",
+		"%fnl_v1_printf = alloca i64",
+		"%fnl_v2_signed = alloca i64",
+	} {
+		if !strings.Contains(ll, want) {
+			t.Fatalf("LLVM IR missing %q:\n%s", want, ll)
 		}
 	}
 }
@@ -242,7 +288,7 @@ func TestStringComparisons(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GenerateC returned error: %v", err)
 	}
-	for _, want := range []string{"fnl_str_cmp(a, b) == 0", "fnl_str_cmp(a, c) != 0", "fnl_str_cmp(d, a) < 0", "fnl_str_cmp(a, b) >= 0"} {
+	for _, want := range []string{"fnl_str_cmp(fnl_v0_a, fnl_v1_b) == 0", "fnl_str_cmp(fnl_v0_a, fnl_v2_c) != 0", "fnl_str_cmp(fnl_v3_d, fnl_v0_a) < 0", "fnl_str_cmp(fnl_v0_a, fnl_v1_b) >= 0"} {
 		if !strings.Contains(csrc, want) {
 			t.Fatalf("generated C missing %q:\n%s", want, csrc)
 		}
@@ -276,7 +322,7 @@ func TestIntParsingBuiltins(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GenerateC returned error: %v", err)
 	}
-	for _, want := range []string{"fnl_is_int(good)", "fnl_is_int(bad)", "fnl_to_int(good)"} {
+	for _, want := range []string{"fnl_is_int(fnl_v0_good)", "fnl_is_int(fnl_v1_bad)", "fnl_to_int(fnl_v0_good)"} {
 		if !strings.Contains(csrc, want) {
 			t.Fatalf("generated C missing %q:\n%s", want, csrc)
 		}
@@ -312,7 +358,7 @@ func TestDoubleParsingBuiltins(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GenerateC returned error: %v", err)
 	}
-	for _, want := range []string{"fnl_is_double(good)", "fnl_is_double(bad)", "fnl_to_double(good)", "fnl_is_double_int(42)", "(double)(42)"} {
+	for _, want := range []string{"fnl_is_double(fnl_v0_good)", "fnl_is_double(fnl_v1_bad)", "fnl_to_double(fnl_v0_good)", "fnl_is_double_int(42)", "(double)(42)"} {
 		if !strings.Contains(csrc, want) {
 			t.Fatalf("generated C missing %q:\n%s", want, csrc)
 		}
@@ -387,7 +433,7 @@ func TestNumericConversionOverloads(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GenerateC returned error: %v", err)
 	}
-	for _, want := range []string{"fnl_is_int_double(d)", "(int64_t)(d)"} {
+	for _, want := range []string{"fnl_is_int_double(fnl_v0_d)", "(int64_t)(fnl_v0_d)"} {
 		if !strings.Contains(csrc, want) {
 			t.Fatalf("generated C missing %q:\n%s", want, csrc)
 		}
@@ -436,7 +482,7 @@ func TestInputReturnsString(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GenerateC returned error: %v", err)
 	}
-	if !strings.Contains(csrc, "fnl_string name = fnl_input();") {
+	if !strings.Contains(csrc, "fnl_string fnl_v0_name = fnl_input();") {
 		t.Fatalf("generated C missing input call:\n%s", csrc)
 	}
 	ll, err := GenerateLLVM(prog)
@@ -598,7 +644,7 @@ func TestElseIfBranches(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GenerateC returned error: %v", err)
 	}
-	for _, want := range []string{"} else if ((x == 2)) {", "} else if ((x == 3)) {", "} else {"} {
+	for _, want := range []string{"} else if ((fnl_v0_x == 2)) {", "} else if ((fnl_v0_x == 3)) {", "} else {"} {
 		if !strings.Contains(csrc, want) {
 			t.Fatalf("generated C missing %q:\n%s", want, csrc)
 		}
@@ -649,7 +695,7 @@ func TestNewPrintAndLexingFeatures(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GenerateC returned error: %v", err)
 	}
-	for _, want := range []string{`fnl_print(s);`, `fnl_println(fnl_str_bool((x != y)));`, `fnl_strdup("a\n\tb")`} {
+	for _, want := range []string{`fnl_print(fnl_v2_s);`, `fnl_println(fnl_str_bool((fnl_v0_x != fnl_v1_y)));`, `fnl_strdup("a\n\tb")`} {
 		if !strings.Contains(csrc, want) {
 			t.Fatalf("generated C missing %q:\n%s", want, csrc)
 		}
